@@ -193,8 +193,8 @@ class BSECLibrary:
             raise BSECLibraryError()
 
         exec_dst = '{}/bsec_library'.format(base_dir)
-
         build_flag = True
+        
         if os.path.isfile(exec_dst) and os.path.isfile('{}.md5'.format(exec_dst)):
             with open(exec_dst, 'rb') as f:
                 source_hash = md5(f.read()).hexdigest()
