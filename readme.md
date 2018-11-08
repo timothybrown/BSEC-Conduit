@@ -131,15 +131,15 @@ Uses the Bosch BSEC sensor fusion library to communicate with a BME680.
 
 ### Usage
 ```
-BSECLIbrary(i2c_address, temp_offset, sample_rate, voltage, retain_state)
+BSECLIbrary(i2c_address, temp_offset, sample_rate, voltage, retain_state, logger=None, base_dir=None)
 ```
 - i2c_address: Address of the sensor.                             [0x76|0x77]
 - temp_offset: An offset to add to the temperature sensor.    [10.0 to -10.0]
 - sample_rate: Seconds between samples.                               [3|300]
-- voltage: The voltage the sensor is run at.                    [3.3|1.8]
-- retain_state: Number of days to retain the IAQ state data.            [4|28]
+- voltage: The voltage the sensor is run at.                        [3.3|1.8]
+- retain_state: Number of days to retain the IAQ state data.           [4|28]
 - logger: Logger instance to use. Use None for console output.
-- base_dir: Directory to store the executable, config and state files. Must also include a sub-directory that contains an unzipped copy of the Bosch Sensortec BSEC Library source.
+- base_dir: Directory to store the executable, config and state files. Must also include a sub-directory that contains an unzipped copy of the Bosch Sensortec BSEC Library source. Use None to automatically determine.
 
 Example:
 ```
