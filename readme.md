@@ -1,4 +1,4 @@
-# BSEC-Conduit Daemon - 2018.11.06 - (C) 2018 TimothyBrown
+# BSEC Conduit Daemon
 A first class Systemd process which acts as a conduit between between BSEC Library
 and MQTT. Provides an alternative method of getting data out of an I2C connected
 Bosch BME680 sensor and into Home Assistant. Much more accurate than the native
@@ -8,12 +8,12 @@ fusion library to process the raw BME680 senor readings.
 Thanks to @rstoermer for `bsec_bme680.py` upon which I based this.
 (https://github.com/rstoermer/bsec_bme680_python/)
 
-### Attribution
+## Attribution
 - BSEC-Conduit:
     - @TimothyBrown (2018)
     - MIT License
 
-### Requirements
+## Requirements
 - python-systemd
 - paho.mqtt
 
@@ -21,19 +21,19 @@ Thanks to @rstoermer for `bsec_bme680.py` upon which I based this.
   *or*
 `pip3 install python-systemd paho.mqtt`
 
-### Installation
+## Installation
 In this example we'll be installing into `/opt/bsec` with the user `homeassistant`
 on a recent Debian based distro (Raspbian/Hassbian):
-- `sudo mkdir /opt/bsec`
-- `sudo chown homeassistant:homeassistant /opt/bsec`
-- `sudo -u homeassistant -H -s`
-- `git clone https://github.com/timothybrown/BSEC-Conduit.git /opt/bsec`
-- `cd /opt/bsec`
-- `sudo python3 install.py`
+- `sudo mkdir /opt/bsec` Create the directory.
+- `sudo chown homeassistant:homeassistant /opt/bsec` Change permissions on the directory.
+- `sudo -u homeassistant -H -s` Login as the user.
+- `git clone https://github.com/timothybrown/BSEC-Conduit.git /opt/bsec` Clone the repo into our new directory.
+- `cd /opt/bsec` Change into the directory.
+- `sudo python3 install.py` Run the installer.
 - `nano BSEC-Conduit` Edit the config section at the top of the file. Use `CTRL-X` to save.
-- `sudo systemctl start BSEC-Conduit.service; journalctl -f -u BSEC-Conduit.service`
+- `sudo systemctl start BSEC-Conduit.service; journalctl -f -u BSEC-Conduit.service` Start the program and open the log file.
 
-### Version History
+## Version History
 - v0.1.0: 2018.08.01
     - Rstoermer's original script.
 - v0.2.0: 2018.10.20
@@ -114,25 +114,24 @@ on a recent Debian based distro (Raspbian/Hassbian):
   - Public Release
 
 # BSECLibrary
-Uses the Bosch BSEC sensor fusion library to communicate with a BME680.
+Uses the Bosch BSEC sensor fusion library to retrieve and process data from a BME680 sensor.
 
-### Attribution
+## Attribution
 - BSEC-Conduit:
   - @TimothyBrown (2018)
   - MIT License
-- bsec_library.c:
+- bme680_bsec.c:
   - Original by @alexh.name (2017)
   - I2C Code by @twartzek (2017)
   - Modifications by @TimothyBrown (2018)
   - MIT License
-- BSEC 1.4.7.1 Generic Release (20180907):
+- BSEC 1.4.7.1 Generic Release (2018):
   - Bosch Sensortec GmbH
   - Private License
 
-### Usage
-```
-BSECLIbrary(i2c_address, temp_offset, sample_rate, voltage, retain_state, logger=None, base_dir=None)
-```
+## Usage
+
+### BSECLibrary(i2c_address, temp_offset, sample_rate, voltage, retain_state, logger=None, base_dir=None)
 - i2c_address: Address of the sensor.                             [0x76|0x77]
 - temp_offset: An offset to add to the temperature sensor.    [10.0 to -10.0]
 - sample_rate: Seconds between samples.                               [3|300]
@@ -141,7 +140,22 @@ BSECLIbrary(i2c_address, temp_offset, sample_rate, voltage, retain_state, logger
 - logger: Logger instance to use. Use None for console output.
 - base_dir: Directory to store the executable, config and state files. Must also include a sub-directory that contains an unzipped copy of the Bosch Sensortec BSEC Library source. Use None to automatically determine.
 
-Example:
+### BSECLibrary.open()
+Call to start the underlying BSEC Library communication process.
+
+### BSECLibrary.close()
+Call to stop the underlying BSEC Library communication process.
+
+### BSECLibrary.output()
+Returns an iterator that you can loop over forever. Blocks between samples from the sensor. Each item is a dict() that contains the following keys:
+- IAQ Accuracy
+- IAQ
+- Temperature
+- Humidity
+- Pressure
+- Status
+
+### Example
 ```
 from bseclib import BSECLibrary
 
@@ -157,7 +171,7 @@ for sample in bsec_lib.output():
         count += 1
 ```
 
-### Version History
+## Version History
 - v0.1.0: 2018.11.05
   - Initial version!
   - Moved all the bsec_library process creation code from BSEC-Conduit into this class.
