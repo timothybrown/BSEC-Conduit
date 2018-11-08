@@ -105,7 +105,7 @@ on a recent Debian based distro (Raspbian/Hassbian):
   - Implemented the BSECLibrary class, which takes care of building the bsec_library
   executable, copying the config file and running the process. This now makes BSEC-Conduit
   fully stand-alone! You no longer have to build the bsec_library executable as our
-  class takes care of all of that for you. Simply supply the Bosch BSEC source
+  class takes care that for you. Simply supply the Bosch BSEC source
   and we'll take care of the rest! See the revision information of BSECLibrary for
   more information.
   - Added an `install.py` script to take care of setting up the Systemd service,
@@ -139,7 +139,7 @@ BSECLIbrary(i2c_address, temp_offset, sample_rate, voltage, retain_state)
 - voltage: The voltage the sensor is run at.                    [3.3|1.8]
 - retain_state: Number of days to retain the IAQ state data.            [4|28]
 - logger: Logger instance to use. Use None for console output.
-- base_dir: Directory to store the executable, config and state files. Must also include a sub-directory named `src` that contains an untouched copy of the Bosch Sensortec BSEC Library source.
+- base_dir: Directory to store the executable, config and state files. Must also include a sub-directory that contains an unzipped copy of the Bosch Sensortec BSEC Library source.
 
 Example:
 ```
@@ -161,7 +161,7 @@ for sample in bsec_lib.output():
 - v0.1.0: 2018.11.05
   - Initial version!
   - Moved all the bsec_library process creation code from BSEC-Conduit into this class.
-  - Created functions to build the bsec_library process, copy config and create a state file.
+  - Created functions to build the bsec_library process, copy the config and create a state file.
   - Embedded the underlying `bsec_library.c` file directly into the library.
   - Currently using a hack to determine processor type. Fix in next release.
 - v0.1.1: 2018.11.06
@@ -172,11 +172,14 @@ for sample in bsec_lib.output():
   The code will also detect non-Pi ARM machines, like the BeagleBone.
   - Modified the underlying `bme680_bsec.c` file to support setting options
   via command line arguments, instead of static #defines in the source.
-  This allows us to dynamically change configurations on the fly.
+  This allows us to dynamically change configurations without recompiling.
   - Implemented the output() generator, which takes care of reading JSON data from the
-  underlying bsec_library process and converting it and returning a dict of sensor values.
+  underlying bsec_library process, converting it and returning a dict of sensor values.
   This allows you to directly iterate over output() in your script without worrying about
   JSON, strings or bytes.
   - Added tons of error handling to the get_exec(), get_config() and get_state() functions.
+  - Much cleanup, but still lacking comments in many places. (Some didn't make it from BSEC-Conduit,
+  others weren't fit for public consumption just yet. Normally I write a skeleton program in comments
+  before writing the actual code, to help organize things. I'll add comments for the next release.)
 - v0.1.2: 2018.11.07
   - Public Release!
