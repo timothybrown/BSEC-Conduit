@@ -199,7 +199,7 @@ class BSECLibrary:
             with open(exec_dst, 'rb') as f:
                 source_hash = md5(f.read()).hexdigest()
             with open('{}.md5'.format(exec_dst), 'rt') as f:
-                target_hash = md5(f.read()).hexdigest().strip()
+                target_hash = f.read().strip()
             if target_hash == source_hash:
                 build_flag = False
                 self.log.info('Found existing BSEC Library executable, skipping build.')
