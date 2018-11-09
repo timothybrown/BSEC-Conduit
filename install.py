@@ -134,17 +134,21 @@ else:
 
 print("\n* Readme First")
 print("""Congratulations! The BSEC-Conduit installation has completed.
-Your next step is to edit bsec-conduit.ini and set your options.
-You can edit the file with the command `nano bsec-conduit.ini`.
+
+Your next step is to edit 'bsec-conduit.ini' and set your options:
+$ nano bsec-conduit.ini
+
 Then you're ready to start the program with one of the following commands:
-> Systemd Based Systems:
-  sudo systemctl start BSEC-Conduit.service; journalctl -f -u BSEC-Conduit.service
-> Other Systems:
-  ./BSEC-Conduit
-If no errors appear you should be good to go! On Systemd based systems you can safely
-reboot and the program will start automatically. On other systems you'll need to create
-a startup entry in your init system (runit, init.d, etc.) or add the following command
-to /etc/rc.local (if available): `{}/BSEC-Conduit &`
+>>> Systemd Based Distros <<<
+$ sudo systemctl start bsec-conduit; journalctl -f -u bsec-conduit
+>>> Other Distros <<<
+$ ./bsec-conduit
+
+If no errors appear you should be good to go! On Systemd based distros you can
+safely reboot and the program will start automatically. On other systems you'll
+need to create a startup entry in your init system (runit, init.d, etc.) or add
+the following command to '/etc/rc.local' (if available):
+{}/bsec-conduit &
 
 If you run into problems please report them by opening a new issue on GitHub.
 
