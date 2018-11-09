@@ -21,7 +21,7 @@ bsec_ver = 'BSEC_1.4.7.1_Generic_Release_20180907'
 bsec_zip = '{}/{}.zip'.format(install_dir, bsec_ver)
 bsec_dir = '{}/{}'.format(install_dir, bsec_ver)
 systemd_dir = "/etc/systemd/system"
-systemd_name = "BSEC-Conduit.service"
+systemd_name = "bsec-conduit.service"
 systemd_unit = """[Unit]
 Description=BSEC-Conduit Daemon
 After=mosquitto.service
@@ -34,7 +34,7 @@ StartLimitIntervalSec=30
 Type=notify
 User={}
 WorkingDirectory={}
-ExecStart={}/BSEC-Conduit
+ExecStart={}/bsec-conduit
 WatchdogSec=30s
 Restart=on-failure
 RestartSec=5
@@ -44,7 +44,7 @@ WantedBy=multi-user.target
 """
 
 print("****************************************************************************")
-print("************************** BSEC Conduit Installer **************************")
+print("************************** BSEC-Conduit Installer **************************")
 print("****************************************************************************")
 if os.getuid() != 0:
     print("Error: This script must be run as root! Please re-run with sudo.")
@@ -134,9 +134,9 @@ else:
 
 print("\n* Readme First")
 print("""Congratulations! The BSEC-Conduit installation has completed.
-Your next step is to edit BSEC-Conduit and change the config options at the
-top of the file. You can edit the file with the command `nano BSEC-Conduit`.
-Afterwards you can start the program with one of the following commands:
+Your next step is to edit bsec-conduit.ini and set your options.
+You can edit the file with the command `nano bsec-conduit.ini`.
+Then you're ready to start the program with one of the following commands:
 > Systemd Based Systems:
   sudo systemctl start BSEC-Conduit.service; journalctl -f -u BSEC-Conduit.service
 > Other Systems:
@@ -145,5 +145,9 @@ If no errors appear you should be good to go! On Systemd based systems you can s
 reboot and the program will start automatically. On other systems you'll need to create
 a startup entry in your init system (runit, init.d, etc.) or add the following command
 to /etc/rc.local (if available): `{}/BSEC-Conduit &`
+
+If you run into problems please report them by opening a new issue on GitHub.
+
+https://github.com/timothybrown/BSEC-Conduit
 """.format(install_dir))
 print("****************************************************************************")

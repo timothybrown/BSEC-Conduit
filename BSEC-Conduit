@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-# BSEC-Conduit Daemon - 2018.11.06 - (C) 2018 TimothyBrown
+# BSEC-Conduit Daemon - 2018.11.07 - (C) 2018 TimothyBrown
 
 A first class Systemd process which acts as a conduit between between BSEC Library
 and MQTT. Provides an alternative method of getting data out of an I2C connected
@@ -11,20 +11,13 @@ fusion library to process the raw BME680 senor readings.
 Thanks to @rstoermer for `bsec_bme680.py` upon which I based this.
 (https://github.com/rstoermer/bsec_bme680_python/)
 
-### Attribution
-BSEC-Conduit:
-    TimothyBrown (2018)
-    Parts by rstoermer (2018)
-    MIT License
+Released under the MIT License.
 
-### Requirements
-python-systemd
-paho.mqtt
-bseclib
+Requires: [python-systemd] [paho.mqtt] [bseclib]
 """
 
 __name__ = 'BSEC-Conduit'
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 # Standard Modules
 import os
@@ -33,6 +26,7 @@ import subprocess
 import time
 import json
 import logging
+import configparser
 from shutil import copy
 from statistics import mean
 from collections import deque
@@ -43,104 +37,6 @@ from systemd import journal
 from systemd import daemon
 from bseclib import BSECLibrary
 
-################################################################################
-############################# Start User Variables #############################
-################################################################################
-
-# BSEC BME680 Path: Full path to the directory we're running from. Set to None
-# to automatically determine it.
-# [String] or [None] Default: None
-bsec_lib_base_path = None
-
-# MQTT Auth: A dict containing the username and password to access the broker broker.
-# If authentication is not required the value may be set to None.
-# Dict Format: {'username': 'bob', 'password': '1234'}
-# [Dict] or [None] Default: None
-mqtt_auth = None
-
-# MQTT Client ID: Client ID to use when publishing. Set to None for a randomly generated ID.
-# [String] or [None] Default: None
-mqtt_client_id = None
-
-# MQTT Host: The IP or hostname of the broker.
-# [String] Default: '127.0.0.1'
-mqtt_host = '127.0.0.1'
-
-# MQTT Port: Connect to this port on the broker.
-# [Integer] Default: 1883
-mqtt_port = 1883
-
-# MQTT Topic Base: The base topic to publish values to.
-# If set to None the topic `<Hostname>/BME680` will be used.
-# [String] Default: None
-mqtt_topic = None
-
-# Discovery Enabled: Enables publishing the Home Assistant discovery topic.
-# [Boolean] Default: True
-discovery_enabled = True
-
-# Discovery Prefix: The prefix for the Home Assistant discovery topic.
-# [String] Default: 'homeassistant'
-discovery_prefix = 'homeassistant'
-
-# Sensor I2C Address: The I2C address of BME680. (Get with `i2cdetect -y 1`.)
-# Values: 0x76|0x77
-# [Integer] Default: 0x77
-sensor_i2c_address = 0x77
-
-# Sensor Temp Offset: Offset to add or subtract from the Temperature value.
-# Values: 10.0 to -10.0
-# [Float] Default: 0.0
-sensor_temp_offset = 0.0
-
-# Sensor Sample Rate: Time between the sensor taking samples.
-# Values: 3|300
-# [Integer] Default: 3
-sensor_sample_rate = 3
-
-# Sensor Voltage: The power supply voltage of the sensor.
-# Values: 1.8|3.3
-# [Float] Default: 3.3
-sensor_voltage = 3.3
-
-# Sensor Retain State: The number of days the underlying library retains IAQ state data.
-# Values: 4|28
-# [Integer] Default: 4
-sensor_retain_state = 4
-
-# Convert to F: If true the Temperature topic will be in F instead of C.
-# [Boolean] Default: False
-convert_to_f = False
-
-# IAQ as Percent: If enabled, reports IAQ as a percentage (0-100%) instead of a
-# raw value (500 to 0)
-# [Boolean] Default: False
-iaq_as_percent = False
-
-# Update Rate: Seconds between publishing results to broker. This value also
-# affects the size of the sample cache. I.e., If Update Rate is 60, BSEC Sample Rate
-# is 3 and Cache Multiplier is 3, the cache will contain (60 / 3) * 3 = 60 samples
-# (or 3 minutes) worth of data.
-# Cache Size = Cache Multiplier * (Update Rate / Sensor Sample Rate [3|300])
-# [Integer] Default: 60
-update_rate = 60
-
-# Cache Multiplier: Controls the size of the sample cache.
-# Functions as a multipler of the update_rate option. A larger cache provides
-# smoother graphs but reacts slower to changes in sensor readings. A value of `3`
-# seems to provide the best balance between speed and smooth graphs.
-# [Integer] Default: 3
-cache_multiplier = 3
-
-# Log Level: How verbose the the logging should be. Valid options are one of:
-# logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR or logging.CRITICAL
-# Use `sudo journalctl -f -u BSEC-Conduit` to monitor the log in real time.
-# [Object] Default: logging.INFO
-log_level = logging.INFO
-
-################################################################################
-############################## End User Variables ##############################
-################################################################################
 
 ### Main Loop Function
 def main():
@@ -149,21 +45,28 @@ def main():
     # Make the BSEC Library object global so our exit handler can catch it.
     # (Note: Ideally we'd simply pass the object to our exit handler, but this will work for now.)
     global bsec_lib
-    bsec_lib = BSECLibrary(sensor_i2c_address, sensor_temp_offset, sensor_sample_rate, sensor_voltage, sensor_retain_state, log, bsec_lib_base_path)
+    bsec_lib = BSECLibrary(sensor_i2c_address,
+                           sensor_temp_offset,
+                           sensor_sample_rate,
+                           sensor_voltage,
+                           sensor_retain_state,
+                           logger = __name__,
+                           base_dir = general_base_path)
 
     # Define Variables
-    num_samples = int(update_rate / bsec_lib.sample_rate)
+    num_samples = int(cache_update_rate / bsec_lib.sample_rate)
     cache_size = int(cache_multiplier * num_samples)
     count = 0
     bsec_status = 0
+    accuracy_code = {0: 'Stabilizing', 1: 'Low', 2: 'Medium', 3: 'High'}
     if watchdog_enabled: watchdog_last = time.time() - watchdog_timeout
+    # Setup Cache.
     cache_IAQ_Accuracy = deque(maxlen=cache_size)
     cache_IAQ = deque(maxlen=cache_size)
     cache_Temperature = deque(maxlen=cache_size)
     cache_Humidity  = deque(maxlen=cache_size)
     cache_Pressure = deque(maxlen=cache_size)
     cache_Gas = deque(maxlen=cache_size)
-    accuracy_code = {0: 'Stabilizing', 1: 'Low', 2: 'Medium', 3: 'High'}
 
     # Set Initial Timestamp (if we're in debug mode.)
     if log_level == logging.DEBUG: timestamp = time.time()
@@ -171,8 +74,8 @@ def main():
     # Open BSEC Library Process and wait for it to connect to the sensor.
     bsec_lib.open()
 
-    if daemon.booted():
-        daemon.notify("READY=1")
+    # Try to tell Systemd we're ready.
+    if systemd: daemon.notify("READY=1")
 
     ## Start of Main Loop ##
     # Enter a (hopefully) infinite 'for loop' and iterate over BSEC Library's output.
@@ -204,16 +107,16 @@ def main():
 
         # If we've collected enough samples, let's process them!
         if count == num_samples:
-            # Generate the median for each value.
+            # Generate the mean for each value.
             IAQ_Accuracy = accuracy_code.get(int(mean(cache_IAQ_Accuracy)), 'Unknown')
             # If enabled, report IAQ in percent, else report the standard numeric value.
-            if iaq_as_percent:
+            if general_iaq_as_percent:
                 # There may be a better way to do this, but this is the straight line approach.
                 IAQ = round((-mean(cache_IAQ) + 500) / 5, 2)
             else:
                 IAQ = round(mean(cache_IAQ), 1)
             # Perform temperature conversion if enabled.
-            if convert_to_f:
+            if general_convert_to_f:
                 Temperature = round((mean(cache_Temperature) * 9 / 5) + 32, 2)
             else:
                 Temperature = round(mean(cache_Temperature), 2)
@@ -226,7 +129,7 @@ def main():
 
             # Debug: More timing information!
             if log_level == logging.DEBUG:
-                log.debug("Read {} samples over {} seconds from BSEC Library.".format(num_samples, update_rate))
+                log.debug("Read {} samples over {} seconds from BSEC Library.".format(num_samples, cache_update_rate))
                 log.debug("IAQ Accuracy: {} | IAQ: {} | Temperature: {} | Humidity: {} | Pressure: {} | Gas: {}".format(
                 IAQ_Accuracy, IAQ, Temperature, Humidity, Pressure, Gas))
 
@@ -265,7 +168,7 @@ def mqtt_discovery(client):
     'name': 'BME680 IAQ',
     'state_topic': '{}/iaq'.format(mqtt_topic),
     'availability_topic': '{}/status'.format(mqtt_topic),
-    'unit_of_measurement': '{unit}'.format(unit = '%' if iaq_as_percent else 'IAQ'),
+    'unit_of_measurement': '{unit}'.format(unit = '%' if general_iaq_as_percent else 'IAQ'),
     'icon': 'mdi:blur'
     }),
     json.dumps({
@@ -273,7 +176,7 @@ def mqtt_discovery(client):
     'name': 'BME680 Temperature',
     'state_topic': '{}/temperature'.format(mqtt_topic),
     'availability_topic': '{}/status'.format(mqtt_topic),
-    'unit_of_measurement': '{unit}'.format(unit = '°F' if convert_to_f else '°C'),
+    'unit_of_measurement': '{unit}'.format(unit = '°F' if general_convert_to_f else '°C'),
     'icon': 'mdi:thermometer'
     }),
     json.dumps({
@@ -317,8 +220,8 @@ def mqtt_on_disconnect(client, userdata, rc):
 ## Defines Exit Handler callback.
 def exit_handler(signum, frame):
     # Tell Systemd we're stopping.
-    if daemon.booted():
-        daemon.notify("STOPPING=1")
+    if systemd: daemon.notify("STOPPING=1")
+
     # Log the signal we caught.
     signame = {1: 'SIGHUP', 2: 'SIGINT', 3: 'SIGQUIT', 15: 'SIGTERM'}
     log.info("Caught Signal {} ({}).".format(signum, signame.get(signum, 'NULL')))
@@ -355,31 +258,110 @@ def get_hostname():
         hostname = "localhost"
     return hostname
 
-
 ### Setup
 ## Logging Setup
 # Create logger, add Systemd Journal Handler set log level.
+log_level = logging.INFO
 log = logging.getLogger(__name__)
 log.addHandler(journal.JournalHandler(SYSLOG_IDENTIFIER=__name__))
 log.setLevel(log_level)
 log.info("{} v{}".format(__name__, __version__))
 
-## Basic Error Checking
-if bsec_lib_base_path is None:
-    bsec_lib_base_path = os.path.abspath(os.getcwd())
-elif not os.path.isdir(bsec_lib_base_path):
-    log.error('BSEC Library Directory Not Found: {}'.format(bsec_lib_base_path))
-    raise NotADirectoryError(bsec_lib_base_path)
-else:
-    bsec_lib_base_path = os.path.abspath(bsec_lib_base_path)
+## Config File Setup
 
-## System Setup
 # Get the RPi serial number for use as a unique hardware ID.
 rpi_serial = get_rpi_serial()
 # Get hostname.
 hostname = get_hostname()
 # Get sensor type.
 sensor_type = 'BME680'
+
+# Make sure the config file is valid.
+if not os.path.isfile('bsec-conduit.ini'):
+    log.error('BSEC-Conduit config file not found! Expected a file named [bsec-conduit.ini].')
+    raise Exception()
+
+# Config parser instance.
+config = configparser.ConfigParser()
+config.read('bsec-conduit.ini')
+
+# The base path.
+general_base_path = config['General']['base_path']
+if general_base_path == '':
+    general_base_path = os.getcwd()
+elif os.path.isdir(general_base_path):
+    general_base_path = os.path.abspath(general_base_path)
+else:
+    log.error('Base Path Not Found: {}'.format(general_base_path))
+    raise Exception()
+
+# Convert to F
+general_convert_to_f = config['General'].getboolean('convert_to_f')
+
+# IAQ as Percent
+general_iaq_as_percent = config['General'].getboolean('iaq_as_percent')
+
+# MQTT User
+mqtt_user = config['MQTT']['user']
+if mqtt_user == '':
+    mqtt_user = None
+
+# MQTT Password
+mqtt_pass = config['MQTT']['pass']
+if mqtt_pass == '':
+    mqtt_pass = None
+
+# MQTT Client ID
+mqtt_client_id = config['MQTT']['client_id']
+if mqtt_client_id == '':
+    # Generate a client id (falls back on MQTT's auto-generation if we're not running on a Pi).
+    if rpi_serial is not None:
+        mqtt_client_id = '{}-{}'.format(sensor_type, rpi_serial)
+        log.info("Generated MQTT Client ID: {}".format(mqtt_client_id))
+    else:
+        mqtt_client_id = None
+
+# MQTT Broker IP or Host
+mqtt_host = config['MQTT'].get('host', '127.0.0.1')
+
+# MQTT Broker Port
+mqtt_port = int(config['MQTT'].get('port', '1883'))
+
+# MQTT Topic
+mqtt_topic = config['MQTT']['topic']
+if mqtt_topic == '':
+    # Generate a base topic if not set by the user.
+    mqtt_topic = '{}/{}'.format(hostname, sensor_type)
+    log.info("Generated MQTT Base Topic: {}".format(mqtt_topic))
+
+# HA Discovery Enabled
+discovery_enabled = config['Discovery'].getboolean('enabled')
+
+# HA Discovery Prefix
+discovery_prefix = config['Discovery'].get('prefix', 'homeassistant')
+
+# Sensor I2C Address
+sensor_i2c_address = int(config['Sensor'].get('i2c_address', '0x77'), 16)
+
+# Sensor Temperature Offset
+sensor_temp_offset = float(config['Sensor'].get('temp_offset', '0.0'))
+
+# Sensor Sample Rate
+sensor_sample_rate = int(config['Sensor'].get('sample_rate', '3'))
+
+# Sensor Voltage
+sensor_voltage = float(config['Sensor'].get('voltage', '3.3'))
+
+# Sensor Retain State
+sensor_retain_state = int(config['Sensor'].get('retain_state', '4'))
+
+# Cache Update Rate
+cache_update_rate = int(config['Cache'].get('update_rate', '60'))
+
+# Cache Multiplier
+cache_multiplier = int(config['Cache'].get('multiplier', '3'))
+
+
 
 ## Signal Handler Setup
 signal.signal(signal.SIGTERM, exit_handler)
@@ -388,8 +370,12 @@ signal.signal(signal.SIGHUP, exit_handler)
 signal.signal(signal.SIGQUIT, exit_handler)
 
 ## Systemd Watchdog Setup
+try:
+    systemd = daemon.booted()
+except NameError:
+    systemd = False
 watchdog_usec = os.getenv('WATCHDOG_USEC')
-if watchdog_usec is not None and daemon.booted():
+if watchdog_usec is not None and systemd:
     watchdog_usec = int(watchdog_usec)
     watchdog_enabled = True
     watchdog_timeout = (watchdog_usec / 1000000) / 2 # Set our timeout as half the watchdog value.
@@ -397,15 +383,7 @@ if watchdog_usec is not None and daemon.booted():
 else: watchdog_enabled = False
 
 ## MQTT Setup
-# Generate a base topic if not set by the user.
-if mqtt_topic is None:
-    mqtt_topic = '{}/{}'.format(hostname, sensor_type)
-    log.info("Generated MQTT Base Topic: {}".format(mqtt_topic))
-# Generate a client id (falls back on MQTT's auto-generation if we're not running on a Pi).
-if mqtt_client_id is None and rpi_serial is not None:
-    mqtt_client_id = '{}-{}'.format(sensor_type, rpi_serial)
-    log.info("Generated MQTT Client ID: {}".format(mqtt_client_id))
-# Define MQTT Client Object.
+# MQTT Client Object.
 mqttc = mqtt.Client(client_id = mqtt_client_id)
 # If mqtt_client_id is still None it means mqtt.Client() auto-generated one, so
 # we'll update mqtt_client_id with that information.
@@ -417,7 +395,7 @@ mqttc.on_connect = mqtt_on_connect
 mqttc.on_disconnect = mqtt_on_disconnect
 mqttc.enable_logger(logger=log)
 mqttc.reconnect_delay_set(min_delay=1, max_delay=120)
-if mqtt_auth is not None: mqttc.username_pw_set(mqtt_auth['username'], mqtt_auth['password'])
+if mqtt_user is not None and mqtt_pass is not None: mqttc.username_pw_set(mqtt_user, mqtt_pass)
 mqttc.will_set('{}/status'.format(mqtt_topic), payload='offline', retain=True)
 # Launch the async connection handler and start the MQTT background loop.
 mqttc.connect_async(mqtt_host, mqtt_port, keepalive=60)

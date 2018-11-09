@@ -1,9 +1,9 @@
-# BSEC Conduit Daemon
+# BSEC-Conduit Daemon
 A first class Systemd process which acts as a conduit between between BSEC Library
 and MQTT. Provides an alternative method of getting data out of an I2C connected
 Bosch BME680 sensor and into Home Assistant. Much more accurate than the native
 HA BME680 module, as it uses the Bosch Sensortec Environmental Cluster (BSEC)
-fusion library to process the raw BME680 senor readings.
+fusion library to process the raw BME680 sensor readings.
 
 Thanks to @rstoermer for `bsec_bme680.py` upon which I based this.
 (https://github.com/rstoermer/bsec_bme680_python/)
@@ -30,8 +30,8 @@ on a recent Debian based distro (Raspbian/Hassbian):
 - `git clone https://github.com/timothybrown/BSEC-Conduit.git /opt/bsec` Clone the repo into our new directory.
 - `cd /opt/bsec` Change into the directory.
 - `sudo python3 install.py` Run the installer.
-- `nano BSEC-Conduit` Edit the config section at the top of the file. Use `CTRL-X` to save.
-- `sudo systemctl start BSEC-Conduit.service; journalctl -f -u BSEC-Conduit.service` Start the program and open the log file.
+- `nano bsec-conduit.ini` Edit the config section at the top of the file. Use `CTRL-X` to save.
+- `sudo systemctl start bsec-conduit.service; journalctl -f -u bsec-conduit.service` Start the program and open the log file.
 
 ## Version History
 - v0.1.0: 2018.08.01
@@ -39,7 +39,7 @@ on a recent Debian based distro (Raspbian/Hassbian):
 - v0.2.0: 2018.10.20
   - Initial rewrite of rstoermer's code.
   - Changed paho.mqtt to use connect_async method. This means it will establish
-  an connection and stay connected until the daemon exits. The original code
+  a connection and stay connected until the daemon exits. The original code
   used the single publish function for each message, which connected/disconnected
   to/from the server for every message. This causes a lot of log spam and
   churning of the Mosquitto persistence database.
@@ -68,12 +68,12 @@ on a recent Debian based distro (Raspbian/Hassbian):
   - Adds Systemd Watchdog support.
   - Adds Home Assistant MQTT Discovery support!
   - Added basic sanity checking on some of the user configuration.
-  - Made all MQTT topics persistant, which prevents gaps in your history graph if
+  - Made all MQTT topics persistent, which prevents gaps in your history graph if
   HA starts before we publish our first reading. Likewise it also allows the
   discovery feature to work if the daemon starts *before* HA, which it should.
   (The way to fix the latter problem would be for the daemon to monitor the
   `homeassistant/status` topic and only publish discovery when it changes
-  to `online`; that said, making the topics persistant solves the problem, so...)
+  to `online`; that said, making the topics persistent solves the problem, so...)
   - Added a feature to automatically generate an MQTT client ID out of the last
   eight digits of the RPi's serial number. Example: BME680-A12BC3D4
   This is more descriptive than paho.mqtt's default random ID, which we fall back
@@ -100,7 +100,7 @@ on a recent Debian based distro (Raspbian/Hassbian):
   and bsec_iaq.config file all exist.
 - v0.3.0: 2018.11.05
   - Major changes!
-  - Spent over a week stability testing previous code. BSEC-Conduit ran non-stop for
+  - I spent over a week stability testing previous code. BSEC-Conduit ran non-stop for
   5 days with no memory leaks or crashes.
   - Implemented the BSECLibrary class, which takes care of building the bsec_library
   executable, copying the config file and running the process. This now makes BSEC-Conduit
@@ -109,9 +109,14 @@ on a recent Debian based distro (Raspbian/Hassbian):
   and we'll take care of the rest! See the revision information of BSECLibrary for
   more information.
   - Added an `install.py` script to take care of setting up the Systemd service,
-  downloading the BSEC source and so on. This is in preperation for release.
+  downloading the BSEC source and so on. This is in preparation for release.
 - v0.3.1: 2018.11.07
   - Public Release
+- v0.3.2: 2018.11.08
+  - Moved config options out of the BSEC-Conduit script and into an INI file.
+  This should make things easier to configure.
+  - Cleaned up and added some comments.
+  - Made some small changes to `installer.py`.
 
 # BSECLibrary
 Uses the Bosch BSEC sensor fusion library to retrieve and process data from a BME680 sensor.
@@ -197,3 +202,7 @@ for sample in bsec_lib.output():
   before writing the actual code, to help organize things. I'll add comments for the next release.)
 - v0.1.2: 2018.11.07
   - Public Release!
+- v0.1.3: 2018.11.08
+  - Fixed a bug that caused the library to crash while performing a hash comparison
+  of the bsec_library executable.
+  - Cleaned up and added comments.

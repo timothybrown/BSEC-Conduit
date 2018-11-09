@@ -8,7 +8,7 @@ MIT License
 """
 
 __name__ = "BSECLibrary"
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 import os
 import subprocess
@@ -21,17 +21,19 @@ import json
 
 class BSECLibraryError(Exception):
     """Base class for exceptions."""
+    # Todo: Expand this into real exception handling sub-classes.
     pass
 
 class BSECLibrary:
     """Handles communication with a BME680 using the Bosch BSEC fusion library."""
 
     def __init__(self, i2c_address, temp_offset, sample_rate, voltage, retain_state, logger=None, base_dir=None):
-        if logger is not None:
-            self.log = logger
-        else:
-            self.log = logging
+        # If the user doesn't pass a logger object, create one.
+        if logger is None:
+            logger = __name__
+        self.log = logging.getLogger(logger)
 
+        # Check the instance variables.
         if 119 > i2c_address < 118:
             self.log.error("Error: <i2c_address> must be one of 0x76 or 0x77.")
             raise BSECLibraryError()
@@ -69,6 +71,7 @@ class BSECLibrary:
         else:
             self.log.error("Error: <base_dir> value of ({}) is not a valid directory.".format(base_dir))
 
+        # Make sure the BSEC source directory exsists.
         src_dirs = [i for i in os.listdir(self.base_dir) if os.path.isdir(i) and 'BSEC_' in i]
         if len(src_dirs) == 0:
             self.log.error('The BSEC source directory could not be located!')
@@ -79,20 +82,25 @@ class BSECLibrary:
         else:
             self.src_dir = os.path.abspath(src_dirs[0])
 
+        # Get executable, config and state file paths.
         self.exec_path = self._get_exec(self.src_dir, self.base_dir)
         self.config_path = self._get_config(self.src_dir, self.base_dir, self.config_string)
         self.state_path = self._get_state(self.base_dir)
 
+        # Set the process variable.
         self.proc = None
 
+    # Property function to generate the config_string variable.
     @property
     def config_string(self):
         return 'generic_{}v_{}s_{}d'.format(str(self.voltage)[0]+str(self.voltage)[2], str(self.sample_rate), str(self.retain_state))
 
+    # Property function to generate the sample_rate_string variable.
     @property
     def sample_rate_string(self):
         return {3: 'LP', 300: 'ULP'}[self.sample_rate]
 
+    # Function to start the bsec_library process.
     def open(self):
         if self.proc is not None:
             self.log.warning("BSEC Library is already running!")
@@ -112,6 +120,7 @@ class BSECLibrary:
             else:
                 self.log.info('BSEC Library started.')
 
+    # Function to stop the bsec_library process.
     def close(self):
         if self.proc is None:
             self.log.warning("BSEC Library is not running!")
@@ -121,6 +130,7 @@ class BSECLibrary:
             self.log.info("BSEC Library stopped.")
             self.proc = None
 
+    # Function to allow the user to iterate over the output.
     def output(self):
         if self.proc is not None:
             for line in iter(self.proc.stdout.readline, b''):
@@ -137,6 +147,7 @@ class BSECLibrary:
             self.log.warning("No data to to parse! Have you started the BSEC Library process?")
             return None
 
+    # Private function to build the executable. Returns the executable path.
     def _get_exec(self, src_dir, base_dir):
         def arch():
             # Make sure we're running under Linux.
@@ -192,12 +203,12 @@ class BSECLibrary:
             self.log.error("Encountered an unknown error trying to determine system architecture.")
             raise BSECLibraryError()
 
+        # Build the executable if needed.
         exec_dst = '{}/bsec_library'.format(base_dir)
         build_flag = True
-        
         if os.path.isfile(exec_dst) and os.path.isfile('{}.md5'.format(exec_dst)):
             with open(exec_dst, 'rb') as f:
-                source_hash = md5(f.read()).hexdigest()
+                source_hash = md5(f.read()).hexdigest().strip()
             with open('{}.md5'.format(exec_dst), 'rt') as f:
                 target_hash = f.read().strip()
             if target_hash == source_hash:
@@ -246,6 +257,7 @@ class BSECLibrary:
                 raise BSECLibraryError()
             else:
                 self.log.info("Build process complete.")
+
             # Write an MD5SUM of the executable.
             with open(exec_dst, 'rb') as f:
                 exec_md5 = md5(f.read()).hexdigest()
@@ -254,6 +266,7 @@ class BSECLibrary:
 
         return exec_dst
 
+    # Private function to copy the config file. Returns the config file path.
     def _get_config(self, src_dir, base_dir, config):
 
         config_dst = '{}/bsec_library.config'.format(base_dir)
@@ -284,6 +297,7 @@ class BSECLibrary:
 
         return config_dst
 
+    # Private function to create the state file if needed. Returns the state file path.
     def _get_state(self, base_dir):
         state_dst = '{}/bsec_library.state'.format(base_dir)
         try:
