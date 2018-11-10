@@ -1,5 +1,5 @@
 # BSEC-Conduit Daemon
-A first class Systemd process which acts as a conduit between between BSEC Library
+A first class Systemd process which acts as a conduit between between BSEC-Library
 and MQTT. Provides an alternative method of getting data out of an I2C connected
 Bosch BME680 sensor and into Home Assistant. Much more accurate than the native
 HA BME680 module, as it uses the Bosch Sensortec Environmental Cluster (BSEC)
@@ -43,20 +43,20 @@ Here's a typical log output when started for the first time, stopping and subseq
  raspberrypi BSEC-Conduit[1234]: Generated MQTT Client ID: BME680-A12BC3D4
  raspberrypi BSEC-Conduit[1234]: Generated MQTT Base Topic: raspberrypi/BME680
  raspberrypi BSEC-Conduit[1234]: Connected to MQTT Broker.
- raspberrypi BSEC-Conduit[1234]: BSEC Library executable or hash file not found, starting build process.
- raspberrypi BSEC-Conduit[1234]: BSEC Library source file not found, writing file: /opt/bsec/BSEC_1.4.7.1_Generic_Release_20180907/bsec-library.c
+ raspberrypi BSEC-Conduit[1234]: BSEC-Library executable or hash file not found, starting build process.
+ raspberrypi BSEC-Conduit[1234]: BSEC-Library source file not found, writing file: /opt/bsec/BSEC_1.4.7.1_Generic_Release_20180907/bsec-library.c
  raspberrypi BSEC-Conduit[1234]: Detected architecture as ARMv8 64-Bit.
  raspberrypi BSEC-Conduit[1234]: Build process complete.
- raspberrypi BSEC-Conduit[1234]: Created new BSEC Library configuration [generic_33v_3s_28d].
- raspberrypi BSEC-Conduit[1234]: Created blank BSEC Library state file.
- raspberrypi BSEC-Conduit[1234]: BSEC Library started.
+ raspberrypi BSEC-Conduit[1234]: Created new BSEC-Library configuration [generic_33v_3s_28d].
+ raspberrypi BSEC-Conduit[1234]: Created blank BSEC-Library state file.
+ raspberrypi BSEC-Conduit[1234]: BSEC-Library started.
  raspberrypi systemd[1]: Started BSEC-Conduit Daemon.
 ```
 `pi@raspberrypi ~# systemctl stop bsec-conduit.service`
 ```
 raspberrypi systemd[1]: Stopping BSEC-Conduit Daemon...
 raspberrypi BSEC-Conduit[1234]: Caught Signal 15 (SIGTERM).
-raspberrypi BSEC-Conduit[1234]: BSEC Library stopped.
+raspberrypi BSEC-Conduit[1234]: BSEC-Library stopped.
 raspberrypi BSEC-Conduit[1234]: Disconnected from MQTT Broker.
 systemd[1]: Stopped BSEC-Conduit Daemon.
 ```
@@ -67,10 +67,10 @@ systemd[1]: Stopped BSEC-Conduit Daemon.
  raspberrypi BSEC-Conduit[2345]: Generated MQTT Client ID: BME680-A12BC3D4
  raspberrypi BSEC-Conduit[2345]: Generated MQTT Base Topic: raspberrypi/BME680
  raspberrypi BSEC-Conduit[2345]: Connected to MQTT Broker.
- raspberrypi BSEC-Conduit[2345]: Found existing BSEC Library executable, skipping build.
- raspberrypi BSEC-Conduit[2345]: Using existing BSEC Library configuration [generic_33v_3s_28d].
- raspberrypi BSEC-Conduit[2345]: Found existing BSEC Library state file, skipping creation.
- raspberrypi BSEC-Conduit[2345]: BSEC Library started.
+ raspberrypi BSEC-Conduit[2345]: Found existing BSEC-Library executable, skipping build.
+ raspberrypi BSEC-Conduit[2345]: Using existing BSEC-Library configuration [generic_33v_3s_28d].
+ raspberrypi BSEC-Conduit[2345]: Found existing BSEC-Library state file, skipping creation.
+ raspberrypi BSEC-Conduit[2345]: BSEC-Library started.
  raspberrypi systemd[1]: Started BSEC-Conduit Daemon.
 ```
 
@@ -89,12 +89,12 @@ systemd[1]: Stopped BSEC-Conduit Daemon.
   (I.e., sensors/BME680/Temperature, sensors/BME680/Humidity, etc.)
   This means you no longer have to use a value_template in Home Assistant and
   seems a more MQTTy way of doing things.
-  - Made small changes to the way the BSEC Library process is opened.
+  - Made small changes to the way the BSEC-Library process is opened.
   - Changed the way that output floats are rounded.
   - Added a counter for the sample loop instead of relying on len().
-  - Added a signal handler to exit cleanly (sends SIGTERM to the BSEC Library
+  - Added a signal handler to exit cleanly (sends SIGTERM to the BSEC-Library
   process, sets the `status` topic and stops the MQTT client loop).
-  - No longer publish the BSEC Library Status value, as it's not a useful metric.
+  - No longer publish the BSEC-Library Status value, as it's not a useful metric.
   Instead we monitor it in the script and if it changes to a non-zero value
   we report the value as an error in the system log and exit. (Systemd should
   restart the daemon up to 5 times, so if it was a temporary problem no user
@@ -124,7 +124,7 @@ systemd[1]: Stopped BSEC-Conduit Daemon.
   - Made several changes to the way samples are stored and processed:
     1) Switched from a list to a deque for storing the samples.
     2) Switched from statistics.median() to statistics.mean() for processing
-       sample data. The BSEC Library already takes care of filtering outliers,
+       sample data. The BSEC-Library already takes care of filtering outliers,
        so the mean value of the period should be a better representation of the
        data, even without weighting enabled.
     3) Implemented an option to enable increasing the sample cache size.
@@ -135,9 +135,9 @@ systemd[1]: Stopped BSEC-Conduit Daemon.
   - Changed the IAQ Accuracy output from a number to a descriptive string:
   0 = Stabilizing, 1 = Low, 2 = Medium, 3 = High
 - v0.2.3: 2018.10.27
-  - Added automatic detection of BSEC Library file parameters. This will help
+  - Added automatic detection of BSEC-Library file parameters. This will help
   with implementing automatic configuration and builds in the next version.
-  - Added startup checks to verify the BSEC Library directory, bsec_bme680 executable
+  - Added startup checks to verify the BSEC-Library directory, bsec_bme680 executable
   and bsec_iaq.config file all exist.
 - v0.3.0: 2018.11.05
   - Major changes!
@@ -188,13 +188,13 @@ Uses the Bosch BSEC sensor fusion library to retrieve and process data from a BM
 - voltage: The voltage the sensor is run at.                        [3.3|1.8]
 - retain_state: Number of days to retain the IAQ state data.           [4|28]
 - logger: Logger instance to use. Use None for console output.
-- base_dir: Directory to store the executable, config and state files. Must also include a sub-directory that contains an unzipped copy of the Bosch Sensortec BSEC Library source. Use None to automatically determine.
+- base_dir: Directory to store the executable, config and state files. Must also include a sub-directory that contains an unzipped copy of the Bosch Sensortec BSEC source. Use None to automatically determine.
 
 ### BSECLibrary.open()
-Call to start the underlying BSEC Library communication process.
+Call to start the underlying BSEC-Library communication process.
 
 ### BSECLibrary.close()
-Call to stop the underlying BSEC Library communication process.
+Call to stop the underlying BSEC-Library communication process.
 
 ### BSECLibrary.output()
 Returns an iterator that you can loop over forever. Blocks between samples from the sensor. Each item is a dict() that contains the following keys:
