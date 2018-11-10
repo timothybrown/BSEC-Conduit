@@ -290,7 +290,7 @@ class BSECLibrary:
             hash = None
 
         if hash in config_hash_table and config_hash_table[hash]['string'] == config:
-            self.log.info("Using exsisting BSEC Library configuration [{}].".format(config))
+            self.log.info("Using existing BSEC Library configuration [{}].".format(config))
         else:
             config_new = copy('{}/config/{}/bsec_iaq.config'.format(src_dir, config), config_dst)
             if config_new != os.path.abspath(config_dst):

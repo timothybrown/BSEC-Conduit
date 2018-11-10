@@ -33,6 +33,46 @@ on a recent Debian based distro (Raspbian/Hassbian):
 - `nano bsec-conduit.ini` Edit the config section at the top of the file. Use `CTRL-X` to save.
 - `sudo systemctl start bsec-conduit.service; journalctl -f -u bsec-conduit.service` Start the program and open the log file.
 
+## Usage
+Here's a typical log output when run for the first time, stopping and subsequent runs:
+`systemctl start bsec-conduit.service`
+```
+ systemd[1]: Starting BSEC-Conduit Daemon...
+ raspberrypi BSEC-Conduit[1234]: BSEC-Conduit v0.3.3
+ raspberrypi BSEC-Conduit[1234]: Generated MQTT Client ID: BME680-A12BC3D4
+ raspberrypi BSEC-Conduit[1234]: Generated MQTT Base Topic: raspberrypi/BME680
+ raspberrypi BSEC-Conduit[1234]: Connected to MQTT Broker.
+ raspberrypi BSEC-Conduit[1234]: BSEC Library executable or hash file not found, starting build process.
+ raspberrypi BSEC-Conduit[1234]: BSEC Library source file not found, writing file: /opt/bsec/BSEC_1.4.7.1_Generic_Release_20180907/bsec-library.c
+ raspberrypi BSEC-Conduit[1234]: Detected architecture as ARMv8 64-Bit.
+ raspberrypi BSEC-Conduit[1234]: Build process complete.
+ raspberrypi BSEC-Conduit[1234]: Created new BSEC Library configuration [generic_33v_3s_28d].
+ raspberrypi BSEC-Conduit[1234]: Created blank BSEC Library state file.
+ raspberrypi BSEC-Conduit[1234]: BSEC Library started.
+ raspberrypi systemd[1]: Started BSEC-Conduit Daemon.
+```
+`systemctl stop bsec-conduit.service`
+```
+raspberrypi systemd[1]: Stopping BSEC-Conduit Daemon...
+raspberrypi BSEC-Conduit[1234]: Caught Signal 15 (SIGTERM).
+raspberrypi BSEC-Conduit[1234]: BSEC Library stopped.
+raspberrypi BSEC-Conduit[1234]: Disconnected from MQTT Broker.
+systemd[1]: Stopped BSEC-Conduit Daemon.
+```
+`systemctl start bsec-conduit.service`
+```
+ systemd[1]: Starting BSEC-Conduit Daemon...
+ raspberrypi BSEC-Conduit[2345]: BSEC-Conduit v0.3.3
+ raspberrypi BSEC-Conduit[2345]: Generated MQTT Client ID: BME680-A12BC3D4
+ raspberrypi BSEC-Conduit[2345]: Generated MQTT Base Topic: raspberrypi/BME680
+ raspberrypi BSEC-Conduit[2345]: Connected to MQTT Broker.
+ raspberrypi BSEC-Conduit[2345]: Found existing BSEC Library executable, skipping build.
+ raspberrypi BSEC-Conduit[2345]: Using existing BSEC Library configuration [generic_33v_3s_28d].
+ raspberrypi BSEC-Conduit[2345]: Found existing BSEC Library state file, skipping creation.
+ raspberrypi BSEC-Conduit[2345]: BSEC Library started.
+ raspberrypi systemd[1]: Started BSEC-Conduit Daemon.
+```
+
 ## Version History
 - v0.1.0: 2018.08.01
     - Rstoermer's original script.
