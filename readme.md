@@ -117,6 +117,10 @@ on a recent Debian based distro (Raspbian/Hassbian):
   This should make things easier to configure.
   - Cleaned up and added some comments.
   - Made some small changes to `installer.py`.
+- v0.3.3: 2018.11.10
+  - Added code to set a custom process name. This allows the program to show up
+  in tools such as `top` by process name: `bsec-conduit` vs `python3 /path/to/bsec-conduit`.
+  - A bit more code cleanup.
 
 # BSECLibrary
 Uses the Bosch BSEC sensor fusion library to retrieve and process data from a BME680 sensor.
@@ -206,3 +210,6 @@ for sample in bsec_lib.output():
   - Fixed a bug that caused the library to crash while performing a hash comparison
   of the bsec_library executable.
   - Cleaned up and added comments.
+- v0.1.4: 2018.11.10
+  - Changed the name of the underlying process from `bsec_library` to `bsec-library`
+  to better match overall naming conventions.

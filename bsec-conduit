@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-# BSEC-Conduit Daemon - 2018.11.07 - (C) 2018 TimothyBrown
+# BSEC-Conduit Daemon - (C) 2018 TimothyBrown
 
 A first class Systemd process which acts as a conduit between between BSEC Library
 and MQTT. Provides an alternative method of getting data out of an I2C connected
@@ -15,9 +15,10 @@ Released under the MIT License.
 
 Requires: [python-systemd] [paho.mqtt] [bseclib]
 """
-
-__name__ = 'BSEC-Conduit'
-__version__ = '0.3.2'
+__program__ = 'BSEC-Conduit'
+__version__ = '0.3.3'
+__date__ = '2018.11.10'
+__author__ = 'Timothy S. Brown'
 
 # Standard Modules
 import os
@@ -40,7 +41,6 @@ from bseclib import BSECLibrary
 
 ### Main Loop Function
 def main():
-
     ## Main Loop Setup
     # Make the BSEC Library object global so our exit handler can catch it.
     # (Note: Ideally we'd simply pass the object to our exit handler, but this will work for now.)
@@ -50,7 +50,7 @@ def main():
                            sensor_sample_rate,
                            sensor_voltage,
                            sensor_retain_state,
-                           logger = __name__,
+                           logger = __program__,
                            base_dir = general_base_path)
 
     # Define Variables
@@ -144,8 +144,8 @@ def main():
     ## End of Main Loop ##
 
     # If we've broken out of the 'for loop' it's because something went very wrong.
-    log.error("BSEC Library encountered an error. Terminating.")
-    exit(1)
+    log.error("BSEC Library encountered an unhandled exception. Terminating.")
+    return(0)
 
 ### MQTT Functions
 ## Defines "Home Assistant Discovery" publisher function.
@@ -258,150 +258,170 @@ def get_hostname():
         hostname = "localhost"
     return hostname
 
+## Set a friendly process name.
+# Normally `top` and other tools would show 'python3 /path/to/script.py',
+# this function allows us to change it to 'script'.
+# See: https://blog.abhi.host/blog/2010/10/18/changing-process-name-of-python-script/
+def set_procname(proc_name):
+    from ctypes import cdll, byref, create_string_buffer
+    # Convert our process name from a string to bytes and format it.
+    proc_name = proc_name.strip().encode('UTF-8')
+    # Load a 3rd party C library.
+    libc = cdll.LoadLibrary('libc.so.6')
+    # Note: One larger than the name (according to `man prctl`).
+    buff = create_string_buffer(len(proc_name)+1)
+    # Null terminated string as it should be
+    buff.value = proc_name
+    # Refer to "#define" of "/usr/include/linux/prctl.h" for the value: 16 & arg[3..5]
+    libc.prctl(15, byref(buff), 0, 0, 0)
+
+
 ### Setup
-## Logging Setup
-# Create logger, add Systemd Journal Handler set log level.
-log_level = logging.INFO
-log = logging.getLogger(__name__)
-log.addHandler(journal.JournalHandler(SYSLOG_IDENTIFIER=__name__))
-log.setLevel(log_level)
-log.info("{} v{}".format(__name__, __version__))
+if __name__ == "__main__":
+    ## Logging Setup
+    # Create logger, add Systemd Journal Handler set log level.
+    log_level = logging.INFO
+    log = logging.getLogger(__program__)
+    log.addHandler(journal.JournalHandler(SYSLOG_IDENTIFIER=__program__))
+    log.setLevel(log_level)
+    log.info("{} v{}".format(__program__, __version__))
 
-## Config File Setup
+    ## System Setup
+    # Set a friendly name for the process.
+    set_procname(__program__.lower())
+    # Get the RPi serial number for use as a unique hardware ID.
+    rpi_serial = get_rpi_serial()
+    # Get hostname.
+    hostname = get_hostname()
+    # Get sensor type.
+    sensor_type = 'BME680'
 
-# Get the RPi serial number for use as a unique hardware ID.
-rpi_serial = get_rpi_serial()
-# Get hostname.
-hostname = get_hostname()
-# Get sensor type.
-sensor_type = 'BME680'
+    ## Config File Setup
+    # Make sure the config file is valid.
+    if not os.path.isfile('bsec-conduit.ini'):
+        log.error('BSEC-Conduit config file not found! Expected a file named [bsec-conduit.ini].')
+        raise Exception()
 
-# Make sure the config file is valid.
-if not os.path.isfile('bsec-conduit.ini'):
-    log.error('BSEC-Conduit config file not found! Expected a file named [bsec-conduit.ini].')
-    raise Exception()
+    # Config parser instance.
+    config = configparser.ConfigParser()
+    config.read('bsec-conduit.ini')
 
-# Config parser instance.
-config = configparser.ConfigParser()
-config.read('bsec-conduit.ini')
-
-# The base path.
-general_base_path = config['General']['base_path']
-if general_base_path == '':
-    general_base_path = os.getcwd()
-elif os.path.isdir(general_base_path):
-    general_base_path = os.path.abspath(general_base_path)
-else:
-    log.error('Base Path Not Found: {}'.format(general_base_path))
-    raise Exception()
-
-# Convert to F
-general_convert_to_f = config['General'].getboolean('convert_to_f')
-
-# IAQ as Percent
-general_iaq_as_percent = config['General'].getboolean('iaq_as_percent')
-
-# MQTT User
-mqtt_user = config['MQTT']['user']
-if mqtt_user == '':
-    mqtt_user = None
-
-# MQTT Password
-mqtt_pass = config['MQTT']['pass']
-if mqtt_pass == '':
-    mqtt_pass = None
-
-# MQTT Client ID
-mqtt_client_id = config['MQTT']['client_id']
-if mqtt_client_id == '':
-    # Generate a client id (falls back on MQTT's auto-generation if we're not running on a Pi).
-    if rpi_serial is not None:
-        mqtt_client_id = '{}-{}'.format(sensor_type, rpi_serial)
-        log.info("Generated MQTT Client ID: {}".format(mqtt_client_id))
+    # The base path.
+    general_base_path = config['General']['base_path']
+    if general_base_path == '':
+        general_base_path = os.getcwd()
+    elif os.path.isdir(general_base_path):
+        general_base_path = os.path.abspath(general_base_path)
     else:
-        mqtt_client_id = None
+        log.error('Base Path Not Found: {}'.format(general_base_path))
+        raise Exception()
 
-# MQTT Broker IP or Host
-mqtt_host = config['MQTT'].get('host', '127.0.0.1')
+    # Convert to F
+    general_convert_to_f = config['General'].getboolean('convert_to_f')
 
-# MQTT Broker Port
-mqtt_port = int(config['MQTT'].get('port', '1883'))
+    # IAQ as Percent
+    general_iaq_as_percent = config['General'].getboolean('iaq_as_percent')
 
-# MQTT Topic
-mqtt_topic = config['MQTT']['topic']
-if mqtt_topic == '':
-    # Generate a base topic if not set by the user.
-    mqtt_topic = '{}/{}'.format(hostname, sensor_type)
-    log.info("Generated MQTT Base Topic: {}".format(mqtt_topic))
+    # MQTT User
+    mqtt_user = config['MQTT']['user']
+    if mqtt_user == '':
+        mqtt_user = None
 
-# HA Discovery Enabled
-discovery_enabled = config['Discovery'].getboolean('enabled')
+    # MQTT Password
+    mqtt_pass = config['MQTT']['pass']
+    if mqtt_pass == '':
+        mqtt_pass = None
 
-# HA Discovery Prefix
-discovery_prefix = config['Discovery'].get('prefix', 'homeassistant')
+    # MQTT Client ID
+    mqtt_client_id = config['MQTT']['client_id']
+    if mqtt_client_id == '':
+        # Generate a client id (falls back on MQTT's auto-generation if we're not running on a Pi).
+        if rpi_serial is not None:
+            mqtt_client_id = '{}-{}'.format(sensor_type, rpi_serial)
+            log.info("Generated MQTT Client ID: {}".format(mqtt_client_id))
+        else:
+            mqtt_client_id = None
 
-# Sensor I2C Address
-sensor_i2c_address = int(config['Sensor'].get('i2c_address', '0x77'), 16)
+    # MQTT Broker IP or Host
+    mqtt_host = config['MQTT'].get('host', '127.0.0.1')
 
-# Sensor Temperature Offset
-sensor_temp_offset = float(config['Sensor'].get('temp_offset', '0.0'))
+    # MQTT Broker Port
+    mqtt_port = int(config['MQTT'].get('port', '1883'))
 
-# Sensor Sample Rate
-sensor_sample_rate = int(config['Sensor'].get('sample_rate', '3'))
+    # MQTT Topic
+    mqtt_topic = config['MQTT']['topic']
+    if mqtt_topic == '':
+        # Generate a base topic if not set by the user.
+        mqtt_topic = '{}/{}'.format(hostname, sensor_type)
+        log.info("Generated MQTT Base Topic: {}".format(mqtt_topic))
 
-# Sensor Voltage
-sensor_voltage = float(config['Sensor'].get('voltage', '3.3'))
+    # HA Discovery Enabled
+    discovery_enabled = config['Discovery'].getboolean('enabled')
 
-# Sensor Retain State
-sensor_retain_state = int(config['Sensor'].get('retain_state', '4'))
+    # HA Discovery Prefix
+    discovery_prefix = config['Discovery'].get('prefix', 'homeassistant')
 
-# Cache Update Rate
-cache_update_rate = int(config['Cache'].get('update_rate', '60'))
+    # Sensor I2C Address
+    sensor_i2c_address = int(config['Sensor'].get('i2c_address', '0x77'), 16)
 
-# Cache Multiplier
-cache_multiplier = int(config['Cache'].get('multiplier', '3'))
+    # Sensor Temperature Offset
+    sensor_temp_offset = float(config['Sensor'].get('temp_offset', '0.0'))
+
+    # Sensor Sample Rate
+    sensor_sample_rate = int(config['Sensor'].get('sample_rate', '3'))
+
+    # Sensor Voltage
+    sensor_voltage = float(config['Sensor'].get('voltage', '3.3'))
+
+    # Sensor Retain State
+    sensor_retain_state = int(config['Sensor'].get('retain_state', '4'))
+
+    # Cache Update Rate
+    cache_update_rate = int(config['Cache'].get('update_rate', '60'))
+
+    # Cache Multiplier
+    cache_multiplier = int(config['Cache'].get('multiplier', '3'))
 
 
+    ## Signal Handler Setup
+    signal.signal(signal.SIGTERM, exit_handler)
+    signal.signal(signal.SIGINT, exit_handler)
+    signal.signal(signal.SIGHUP, exit_handler)
+    signal.signal(signal.SIGQUIT, exit_handler)
 
-## Signal Handler Setup
-signal.signal(signal.SIGTERM, exit_handler)
-signal.signal(signal.SIGINT, exit_handler)
-signal.signal(signal.SIGHUP, exit_handler)
-signal.signal(signal.SIGQUIT, exit_handler)
+    ## Systemd Watchdog Setup
+    try:
+        systemd = daemon.booted()
+    except NameError:
+        systemd = False
+    watchdog_usec = os.getenv('WATCHDOG_USEC')
+    if watchdog_usec is not None and systemd:
+        watchdog_usec = int(watchdog_usec)
+        watchdog_enabled = True
+        watchdog_timeout = (watchdog_usec / 1000000) / 2 # Set our timeout as half the watchdog value.
+        if log_level == logging.DEBUG: log.debug("Watchdog timer enabled. Petting the dog every {} seconds.".format(watchdog_timeout))
+    else: watchdog_enabled = False
 
-## Systemd Watchdog Setup
-try:
-    systemd = daemon.booted()
-except NameError:
-    systemd = False
-watchdog_usec = os.getenv('WATCHDOG_USEC')
-if watchdog_usec is not None and systemd:
-    watchdog_usec = int(watchdog_usec)
-    watchdog_enabled = True
-    watchdog_timeout = (watchdog_usec / 1000000) / 2 # Set our timeout as half the watchdog value.
-    if log_level == logging.DEBUG: log.debug("Watchdog timer enabled. Petting the dog every {} seconds.".format(watchdog_timeout))
-else: watchdog_enabled = False
+    ## MQTT Setup
+    # MQTT Client Object.
+    mqttc = mqtt.Client(client_id = mqtt_client_id)
+    # If mqtt_client_id is still None it means mqtt.Client() auto-generated one, so
+    # we'll update mqtt_client_id with that information.
+    if mqtt_client_id is None:
+        mqtt_client_id = mqttc._client_id
+    # Register callback handlers, enable logging and set the reconnect delay,
+    # authentication parameters and last will.
+    mqttc.on_connect = mqtt_on_connect
+    mqttc.on_disconnect = mqtt_on_disconnect
+    mqttc.enable_logger(logger=log)
+    mqttc.reconnect_delay_set(min_delay=1, max_delay=120)
+    if mqtt_user is not None and mqtt_pass is not None: mqttc.username_pw_set(mqtt_user, mqtt_pass)
+    mqttc.will_set('{}/status'.format(mqtt_topic), payload='offline', retain=True)
+    # Launch the async connection handler and start the MQTT background loop.
+    mqttc.connect_async(mqtt_host, mqtt_port, keepalive=60)
+    mqttc.loop_start()
+    # Sleep for a second to allow the MQTT connection to establish. (Maybe not needed?)
+    time.sleep(1)
 
-## MQTT Setup
-# MQTT Client Object.
-mqttc = mqtt.Client(client_id = mqtt_client_id)
-# If mqtt_client_id is still None it means mqtt.Client() auto-generated one, so
-# we'll update mqtt_client_id with that information.
-if mqtt_client_id is None:
-    mqtt_client_id = mqttc._client_id
-# Register callback handlers, enable logging and set the reconnect delay,
-# authentication parameters and last will.
-mqttc.on_connect = mqtt_on_connect
-mqttc.on_disconnect = mqtt_on_disconnect
-mqttc.enable_logger(logger=log)
-mqttc.reconnect_delay_set(min_delay=1, max_delay=120)
-if mqtt_user is not None and mqtt_pass is not None: mqttc.username_pw_set(mqtt_user, mqtt_pass)
-mqttc.will_set('{}/status'.format(mqtt_topic), payload='offline', retain=True)
-# Launch the async connection handler and start the MQTT background loop.
-mqttc.connect_async(mqtt_host, mqtt_port, keepalive=60)
-mqttc.loop_start()
-# Sleep for a second to allow the MQTT connection to establish. (Maybe not needed?)
-time.sleep(1)
-
-# Start the main loop!
-main()
+    # Start the main loop!
+    exit(main())

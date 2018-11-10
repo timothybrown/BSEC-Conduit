@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-BSECLibrary: Uses the Bosch BSEC sensor fusion library to communicate with a BME680.
+# BSECLibrary - (C) 2018 TimothyBrown
 
-(C) 2018 TimothyBrown
+Uses the Bosch BSEC sensor fusion library to communicate with a BME680.
+
+
 
 MIT License
 """
-
-__name__ = "BSECLibrary"
-__version__ = '0.1.3'
+__program__ = 'BSECLibrary'
+__version__ = '0.1.4'
+__date__ = '2018.11.10'
+__author__ = 'Timothy S. Brown'
 
 import os
 import subprocess
@@ -100,7 +103,7 @@ class BSECLibrary:
     def sample_rate_string(self):
         return {3: 'LP', 300: 'ULP'}[self.sample_rate]
 
-    # Function to start the bsec_library process.
+    # Function to start the bsec-library process.
     def open(self):
         if self.proc is not None:
             self.log.warning("BSEC Library is already running!")
@@ -120,7 +123,7 @@ class BSECLibrary:
             else:
                 self.log.info('BSEC Library started.')
 
-    # Function to stop the bsec_library process.
+    # Function to stop the bsec-library process.
     def close(self):
         if self.proc is None:
             self.log.warning("BSEC Library is not running!")
@@ -204,7 +207,7 @@ class BSECLibrary:
             raise BSECLibraryError()
 
         # Build the executable if needed.
-        exec_dst = '{}/bsec_library'.format(base_dir)
+        exec_dst = '{}/bsec-library'.format(base_dir)
         build_flag = True
         if os.path.isfile(exec_dst) and os.path.isfile('{}.md5'.format(exec_dst)):
             with open(exec_dst, 'rb') as f:
@@ -220,9 +223,9 @@ class BSECLibrary:
             self.log.warning('BSEC Library executable or hash file not found, starting build process.')
         if build_flag:
             # See if we need to write the source file.
-            if not os.path.isfile('{}/bsec_library.c'.format(src_dir)):
-                self.log.warning("BSEC Library source file not found, writing file: {}/bsec_library.c".format(src_dir))
-                with open('{}/bsec_library.c'.format(src_dir), 'wb') as f:
+            if not os.path.isfile('{}/bsec-library.c'.format(src_dir)):
+                self.log.warning("BSEC Library source file not found, writing file: {}/bsec-library.c".format(src_dir))
+                with open('{}/bsec-library.c'.format(src_dir), 'wb') as f:
                     f.write(bsec_library_c.encode('UTF-8'))
 
             lib_arch = arch()
@@ -238,7 +241,7 @@ class BSECLibrary:
                             '-iquote{}/examples'.format(src_dir),
                             '{}/API/bme680.c'.format(src_dir),
                             '{}/examples/bsec_integration.c'.format(src_dir),
-                            '{}/bsec_library.c'.format(src_dir),
+                            '{}/bsec-library.c'.format(src_dir),
                             '-L{}/algo/bin/{}'.format(src_dir, lib_arch),
                             '-lalgobsec',
                             '-lm',
@@ -269,7 +272,7 @@ class BSECLibrary:
     # Private function to copy the config file. Returns the config file path.
     def _get_config(self, src_dir, base_dir, config):
 
-        config_dst = '{}/bsec_library.config'.format(base_dir)
+        config_dst = '{}/bsec-library.config'.format(base_dir)
         config_hash_table = {
             '305c5398b0359f7956584a7a52bb48ea': {'string': 'generic_18v_300s_28d', 'voltage': 1.8, 'sample rate': 300, 'retain state': 28},
             'eecd6e4000afa21901bb28e182a75c6e': {'string': 'generic_18v_300s_4d', 'voltage': 1.8, 'sample rate': 300, 'retain state': 4},
@@ -299,7 +302,7 @@ class BSECLibrary:
 
     # Private function to create the state file if needed. Returns the state file path.
     def _get_state(self, base_dir):
-        state_dst = '{}/bsec_library.state'.format(base_dir)
+        state_dst = '{}/bsec-library.state'.format(base_dir)
         try:
             open(state_dst, 'xb')
         except FileExistsError:
@@ -362,8 +365,8 @@ int g_i2cFid; // I2C Linux device handle
 int i2c_address; // Changed from #define to argv[1].
 float temp_offset; // Changed from #define to argv[2].
 float sample_rate_mode; // Changed from #define to argv[3].
-char *filename_state = "bsec_library.state";
-char *filename_config = "bsec_library.config";
+char *filename_state = "bsec-library.state";
+char *filename_config = "bsec-library.config";
 
 /* functions */
 
@@ -706,3 +709,6 @@ int main(int argc, char *argv[])
   return 0;
 }
 """
+if __name__ == "__main__":
+    logging.critical("This module cannot not run standalone.")
+    exit(1)
