@@ -106,7 +106,7 @@ class BSECLibrary:
     # Function to start the bsec-library process.
     def open(self):
         if self.proc is not None:
-            self.log.warning("BSEC Library is already running!")
+            self.log.warning("BSEC-Library is already running!")
         else:
             try:
                 with open('/etc/timezone', 'rt') as f:
@@ -118,19 +118,19 @@ class BSECLibrary:
             run_command = [self.exec_path, str(self.i2c_address), str(self.temp_offset), self.sample_rate_string]
             self.proc = subprocess.Popen(run_command, stdout=subprocess.PIPE)
             if self.proc.returncode is not None:
-                self.log.error('BSEC Library encountered an error ({}) during startup.'.format(self.proc.returncode))
+                self.log.error('BSEC-Library encountered an error ({}) during startup.'.format(self.proc.returncode))
                 raise BSECLibraryError()
             else:
-                self.log.info('BSEC Library started.')
+                self.log.info('BSEC-Library started.')
 
     # Function to stop the bsec-library process.
     def close(self):
         if self.proc is None:
-            self.log.warning("BSEC Library is not running!")
+            self.log.warning("BSEC-Library is not running!")
         else:
             self.proc.send_signal(15)
             sleep(1)
-            self.log.info("BSEC Library stopped.")
+            self.log.info("BSEC-Library stopped.")
             self.proc = None
 
     # Function to allow the user to iterate over the output.
@@ -140,14 +140,14 @@ class BSECLibrary:
                 data = dict(json.loads(line.decode('UTF-8')))
                 if data['Status'] != '0':
                     # If there's a problem, yo we'll log it...
-                    self.log.error("BSEC Library returned error {}.".format(data['Status']))
+                    self.log.error("BSEC-Library returned error {}.".format(data['Status']))
                     # ...kill the process and hope that resolves it! (Ice, ice, baby.)
                     raise BSECLibraryError()
                 else:
                     yield data
-            self.log.warning("BSEC Library ran out of data to yield!")
+            self.log.warning("BSEC-Library ran out of data to yield!")
         else:
-            self.log.warning("No data to to parse! Have you started the BSEC Library process?")
+            self.log.warning("No data to to parse! Have you started the BSEC-Library process?")
             return None
 
     # Private function to build the executable. Returns the executable path.
@@ -216,15 +216,15 @@ class BSECLibrary:
                 target_hash = f.read().strip()
             if target_hash == source_hash:
                 build_flag = False
-                self.log.info('Found existing BSEC Library executable, skipping build.')
+                self.log.info('Found existing BSEC-Library executable, skipping build.')
             else:
-                self.log.warning("BSEC Library executable and hash file don't match, rebuilding.")
+                self.log.warning("BSEC-Library executable and hash file don't match, rebuilding.")
         else:
-            self.log.warning('BSEC Library executable or hash file not found, starting build process.')
+            self.log.warning('BSEC-Library executable or hash file not found, starting build process.')
         if build_flag:
             # See if we need to write the source file.
             if not os.path.isfile('{}/bsec-library.c'.format(src_dir)):
-                self.log.warning("BSEC Library source file not found, writing file: {}/bsec-library.c".format(src_dir))
+                self.log.warning("BSEC-Library source file not found, writing file: {}/bsec-library.c".format(src_dir))
                 with open('{}/bsec-library.c'.format(src_dir), 'wb') as f:
                     f.write(bsec_library_c.encode('UTF-8'))
 
@@ -290,13 +290,13 @@ class BSECLibrary:
             hash = None
 
         if hash in config_hash_table and config_hash_table[hash]['string'] == config:
-            self.log.info("Using existing BSEC Library configuration [{}].".format(config))
+            self.log.info("Using existing BSEC-Library configuration [{}].".format(config))
         else:
             config_new = copy('{}/config/{}/bsec_iaq.config'.format(src_dir, config), config_dst)
             if config_new != os.path.abspath(config_dst):
                 self.log.error("Error creating config file!")
                 raise BSECLibraryError()
-            self.log.info("Created new BSEC Library configuration [{}].".format(config))
+            self.log.info("Created new BSEC-Library configuration [{}].".format(config))
 
         return config_dst
 
@@ -306,12 +306,12 @@ class BSECLibrary:
         try:
             open(state_dst, 'xb')
         except FileExistsError:
-            self.log.info('Found existing BSEC Library state file, skipping creation.')
+            self.log.info('Found existing BSEC-Library state file, skipping creation.')
         else:
-            self.log.info('Created blank BSEC Library state file.')
+            self.log.info('Created blank BSEC-Library state file.')
         return state_dst
 
-# The C code for the BSEC Library process itself.
+# The C code for the BSEC-Library process itself.
 bsec_library_c = """/* Copyright (C) 2017 alexh.name */
 /* I2C code by twartzek 2017 */
 /* argv[] code by TimothyBrown 2018 */
