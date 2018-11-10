@@ -34,8 +34,9 @@ on a recent Debian based distro (Raspbian/Hassbian):
 - `sudo systemctl start bsec-conduit.service; journalctl -f -u bsec-conduit.service` Start the program and open the log file.
 
 ## Usage
-Here's a typical log output when run for the first time, stopping and subsequent runs:
-`systemctl start bsec-conduit.service`
+Here's a typical log output when started for the first time, stopping and subsequent runs:
+
+`pi@raspberrypi ~# systemctl start bsec-conduit.service`
 ```
  systemd[1]: Starting BSEC-Conduit Daemon...
  raspberrypi BSEC-Conduit[1234]: BSEC-Conduit v0.3.3
@@ -51,7 +52,7 @@ Here's a typical log output when run for the first time, stopping and subsequent
  raspberrypi BSEC-Conduit[1234]: BSEC Library started.
  raspberrypi systemd[1]: Started BSEC-Conduit Daemon.
 ```
-`systemctl stop bsec-conduit.service`
+`pi@raspberrypi ~# systemctl stop bsec-conduit.service`
 ```
 raspberrypi systemd[1]: Stopping BSEC-Conduit Daemon...
 raspberrypi BSEC-Conduit[1234]: Caught Signal 15 (SIGTERM).
@@ -59,7 +60,7 @@ raspberrypi BSEC-Conduit[1234]: BSEC Library stopped.
 raspberrypi BSEC-Conduit[1234]: Disconnected from MQTT Broker.
 systemd[1]: Stopped BSEC-Conduit Daemon.
 ```
-`systemctl start bsec-conduit.service`
+`pi@raspberrypi ~# systemctl start bsec-conduit.service`
 ```
  systemd[1]: Starting BSEC-Conduit Daemon...
  raspberrypi BSEC-Conduit[2345]: BSEC-Conduit v0.3.3
