@@ -2,7 +2,7 @@
 """
 # BSEC-Conduit Daemon - (C) 2018 TimothyBrown
 
-A first class Systemd process which acts as a conduit between between BSEC Library
+A first class Systemd process which acts as a conduit between between BSEC-Library
 and MQTT. Provides an alternative method of getting data out of an I2C connected
 Bosch BME680 sensor and into Home Assistant. Much more accurate than the native
 HA BME680 module, as it uses the Bosch Sensortec Environmental Cluster (BSEC)
@@ -42,7 +42,7 @@ from bseclib import BSECLibrary
 ### Main Loop Function
 def main():
     ## Main Loop Setup
-    # Make the BSEC Library object global so our exit handler can catch it.
+    # Make the BSEC-Library object global so our exit handler can catch it.
     # (Note: Ideally we'd simply pass the object to our exit handler, but this will work for now.)
     global bsec_lib
     bsec_lib = BSECLibrary(sensor_i2c_address,
@@ -71,14 +71,14 @@ def main():
     # Set Initial Timestamp (if we're in debug mode.)
     if log_level == logging.DEBUG: timestamp = time.time()
 
-    # Open BSEC Library Process and wait for it to connect to the sensor.
+    # Open BSEC-Library Process and wait for it to connect to the sensor.
     bsec_lib.open()
 
     # Try to tell Systemd we're ready.
     if systemd: daemon.notify("READY=1")
 
     ## Start of Main Loop ##
-    # Enter a (hopefully) infinite 'for loop' and iterate over BSEC Library's output.
+    # Enter a (hopefully) infinite 'for loop' and iterate over BSEC-Library's output.
     for sample in bsec_lib.output():
 
         # First step is to  determine if we need to ping the watchdog timer.
@@ -129,7 +129,7 @@ def main():
 
             # Debug: More timing information!
             if log_level == logging.DEBUG:
-                log.debug("Read {} samples over {} seconds from BSEC Library.".format(num_samples, cache_update_rate))
+                log.debug("Read {} samples over {} seconds from BSEC-Library.".format(num_samples, cache_update_rate))
                 log.debug("IAQ Accuracy: {} | IAQ: {} | Temperature: {} | Humidity: {} | Pressure: {} | Gas: {}".format(
                 IAQ_Accuracy, IAQ, Temperature, Humidity, Pressure, Gas))
 
@@ -144,7 +144,7 @@ def main():
     ## End of Main Loop ##
 
     # If we've broken out of the 'for loop' it's because something went very wrong.
-    log.error("BSEC Library encountered an unhandled exception. Terminating.")
+    log.error("BSEC-Library encountered an unhandled exception. Terminating.")
     return(0)
 
 ### MQTT Functions
@@ -230,7 +230,7 @@ def exit_handler(signum, frame):
         exit_code = 0
     else:
         exit_code = signum + 128
-    # Terminate the BSEC Library process if it's running.
+    # Terminate the BSEC-Library process if it's running.
     bsec_lib.close()
     # Set MQTT status to offline.
     mqttc.publish('{}/status'.format(mqtt_topic), payload='offline', retain=True)
