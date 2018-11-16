@@ -9,15 +9,15 @@ Uses the Bosch BSEC sensor fusion library to communicate with a BME680.
 MIT License
 """
 __program__ = 'BSECLibrary'
-__version__ = '0.1.4'
-__date__ = '2018.11.10'
+__version__ = '0.1.5'
+__date__ = '2018.11.16'
 __author__ = 'Timothy S. Brown'
 
 import os
 import subprocess
 import logging
 import platform
-from time import sleep
+import time
 from shutil import copy
 from hashlib import md5
 import json
@@ -108,15 +108,12 @@ class BSECLibrary:
         if self.proc is not None:
             self.log.warning("BSEC-Library is already running!")
         else:
-            try:
-                with open('/etc/timezone', 'rt') as f:
-                    timezone = f.read().strip()
-            except FileNotFoundError:
-                self.log.warning("Could not determine timezone from /etc/timezone file. Using [UTC] as a default.")
-                timezone = "UTC"
-            os.putenv("TZ", timezone)
+            new_env = os.environ.copy()
+            if 'TZ' not in new_env:
+                tz = int((time.timezone if (time.localtime().tm_isdst == 0) else time.altzone) / 60 / 60 * -1)
+                new_env['TZ'] = 'Etc/GMT{}'.format(tz)
             run_command = [self.exec_path, str(self.i2c_address), str(self.temp_offset), self.sample_rate_string]
-            self.proc = subprocess.Popen(run_command, stdout=subprocess.PIPE)
+            self.proc = subprocess.Popen(run_command, stdout=subprocess.PIPE, env=new_env)
             if self.proc.returncode is not None:
                 self.log.error('BSEC-Library encountered an error ({}) during startup.'.format(self.proc.returncode))
                 raise BSECLibraryError()
@@ -129,7 +126,7 @@ class BSECLibrary:
             self.log.warning("BSEC-Library is not running!")
         else:
             self.proc.send_signal(15)
-            sleep(1)
+            time.sleep(1)
             self.log.info("BSEC-Library stopped.")
             self.proc = None
 

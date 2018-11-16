@@ -1,0 +1,16 @@
+[Unit]
+Description=BSEC-Conduit Daemon
+StartLimitBurst=5
+StartLimitIntervalSec=30
+
+[Service]
+Type=notify
+User=
+WorkingDirectory=
+ExecStart=
+WatchdogSec=30s
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

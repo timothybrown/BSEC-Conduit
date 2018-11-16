@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-"""BSEC-Conduit Installer - 2018.11.06 - (C) 2018 TimothyBrown
+"""BSEC-Conduit Installer - 2018.11.16 - (C) 2018 TimothyBrown
 Usage: Run `sudo python3 install.py` in the directory you want to install to.
 """
 
 import os
+import sys
 import subprocess
 import urllib.request
 import shutil
@@ -22,26 +23,6 @@ bsec_zip = '{}/{}.zip'.format(install_dir, bsec_ver)
 bsec_dir = '{}/{}'.format(install_dir, bsec_ver)
 systemd_dir = "/etc/systemd/system"
 systemd_name = "bsec-conduit.service"
-systemd_unit = """[Unit]
-Description=BSEC-Conduit Daemon
-After=mosquitto.service
-Wants=mosquitto.service
-Before=home-assistant.service
-StartLimitBurst=5
-StartLimitIntervalSec=30
-
-[Service]
-Type=notify
-User={}
-WorkingDirectory={}
-ExecStart={}/bsec-conduit
-WatchdogSec=30s
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-"""
 
 print("****************************************************************************")
 print("************************** BSEC-Conduit Installer **************************")
@@ -50,33 +31,29 @@ if os.getuid() != 0:
     print("Error: This script must be run as root! Please re-run with sudo.")
     exit(1)
 ### Install
-print("\n* Install Location: {}".format(install_dir))
+print("\n  Install Location: {}".format(install_dir))
 for i in range(5):
     print("  Press CTRL-C to abort. Starting in {}...".format(5 - i), end='\r')
     time.sleep(1)
 
 ### BSEC Setup
-print("\n\n* Bosch Sensortec Environmental Cluster (BSEC) Setup")
-if not os.path.isfile(bsec_zip):
-    print("  Downloading the BSEC source archive...", end='\r')
+print("\n\n# Bosch Sensortec Environmental Cluster (BSEC) Setup")
+if not os.path.isfile(bsec_zip) and not os.path.isdir(bsec_dir):
+    print("> Downloading the BSEC source archive...", end='\r')
     with urllib.request.urlopen('{}/{}.zip'.format(bsec_url, bsec_ver)) as response, open(bsec_zip, 'wb') as out_file:
         shutil.copyfileobj(response, out_file)
-        print("  Downloading the BSEC source archive...Done!")
-else:
-    print("  Found exsisting copy of the BSEC source archive, skipping download.")
+        print("- Downloading the BSEC source archive...Done")
 
-if not os.path.isdir(bsec_dir):
-    print("  Extracting the BSEC source archive...", end='\r')
+    print("> Extracting the BSEC source archive...", end='\r')
     with open(bsec_zip, 'rb') as f:
         unzip = zipfile.ZipFile(f)
         unzip.extractall(install_dir)
         os.remove(bsec_zip)
-        print("  Extracting the BSEC source archive...Done!")
+        print("- Extracting the BSEC source archive...Done")
 else:
-    os.remove(bsec_zip)
-    print("  Found exsisting BSEC source directory, skipping extraction!")
+    print("- Found exsisting copy of the BSEC source, skipping download.")
 
-print("  Setting permissions on BSEC source directory...", end='')
+print("> Setting permissions on BSEC source directory...", end='\r')
 try:
     shutil.chown(bsec_dir, user=install_uid, group=install_gid)
     for dirpath, dirnames, filenames in os.walk(bsec_dir):
@@ -87,68 +64,149 @@ try:
             for file in filenames:
                 shutil.chown(os.path.join(dirpath, file), user=install_uid, group=install_gid)
 except Exception:
-    print("Error!")
-    print("# Unable to change permissions on BSEC source directory.")
-    print("# Please run the following command after this script has finished:")
-    print("# sudo chown -R {}:{} {}".format(install_uid, install_gid, bsec_dir))
+    print("* Setting permissions on BSEC source directory...Error")
+    print("  Please run the following command after this script has finished:")
+    print("  sudo chown -R {}:{} {}".format(install_uid, install_gid, bsec_dir))
 else:
-    print("Done!")
+    print("- Setting permissions on BSEC source directory...Done")
 
-print("\n* Systemd Unit Setup")
+time.sleep(1)
+print("\n# Checking for Python Dependencies")
+has_mqtt = True
+has_systemd = True
+print('> Checking enviroment...', end='\r')
+if (hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)):
+    is_venv = True
+    print("- Checking enviroment...Done")
+    print("  Detected a virtual enviroment.")
+else:
+    is_venv = False
+    print("- Checking enviroment...Done")
+    print("  No venv found. Assuming we're running under the system Python enviroment.")
+try:
+    import paho.mqtt
+except ModuleNotFoundError:
+    has_mqtt = False
+try:
+    import systemd
+except ModuleNotFoundError:
+    has_systemd = False
+if has_mqtt:
+    print('- Module [paho.mqtt] found.')
+else:
+    print('* Module [paho.mqtt] not found.')
+    if is_venv:
+        print("  Please use pip to install these packages inside your venv.")
+        print("$ pip3 install paho-mqtt")
+    else:
+        print("  Please use your system package manager or pip to install.")
+        print("$ apt-get install python3-paho-mqtt")
+if has_systemd:
+    print('- Module [systemd-python] found.')
+else:
+    print('* Module [systemd-python] not found.')
+    if is_venv:
+        print("  Please use pip to install these packages inside your venv.")
+        print("$ pip3 install systemd-python")
+    else:
+        print("  Please use your system package manager or pip to install.")
+        print("$ apt-get install python3-systemd")
+
+time.sleep(1)
+print("\n# Systemd Unit Setup")
 if os.path.isdir(systemd_dir):
-    print("  Writing service file [{}]...".format(systemd_name), end='')
-    with open('{}/{}'.format(systemd_dir, systemd_name), 'w+b') as f:
-        f.write(systemd_unit.format(install_username, install_dir, install_dir).encode('UTF-8'))
-    print("Done!")
+    systemd_reload = False
+    print("> Writing service file [{}]...".format(systemd_name), end='\r')
+    try:
+        unit_user = 'User={user}'.format(user=install_username)
+        unit_dir = 'WorkingDirectory={dir}'.format(dir=install_dir)
+        if is_venv:
+            unit_exec = 'ExecStart={dir}/bin/python {dir}/bsec-conduit'.format(dir=install_dir)
+        else:
+            unit_exec = 'ExecStart={dir}/bsec-conduit'.format(dir=install_dir)
+        outpath = '{}/{}'.format(systemd_dir, systemd_name)
+        inpath = '{}/systemd-template'.format(install_dir, systemd_name)
+        with open(inpath, 'rt') as input, open(outpath, 'xt') as output:
+            for line in input:
+                line = line.rstrip()
+                if line.startswith("User="):
+                    line = unit_user
+                elif line.startswith("WorkingDirectory="):
+                    line = unit_dir
+                elif line.startswith("ExecStart="):
+                    line = unit_exec
+                output.write(line)
+                time.sleep(0.1)
+        os.remove(inpath)
+        print("- Writing service file [{}]...Done".format(systemd_name))
+        systemd_reload = True
+    except:
+        print("* Writing service file [{}]...Error".format(systemd_name))
+        print("  Please manually edit and copy the service file:")
+        print("$ sudo mv {} {}".format(inpath, outpath))
+        print("$ sudo systemctl daemon-reload")
+        print("$ sudo systemctl edit --full {}".format(systemd_name))
+        print("  Fill out the following fields:")
+        print('  ' + unit_user)
+        print('  ' + unit_dir)
+        print('  ' + unit_exec)
 
-    print("  Enabling service...", end='')
-    systemctl_cmds = [['systemctl', 'daemon-reload'], ['systemctl', 'enable', systemd_name]]
-    for cmd in systemctl_cmds:
-        systemctl = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if systemd_reload:
+        print("> Reloading Systemd...", end='\r')
+        systemctl_cmd = ['systemctl', 'daemon-reload']
+        systemctl = subprocess.run(systemctl_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if systemctl.returncode != 0:
             systemctl_error = systemctl.stdout.decode()
-            print('Error!')
-            print('# Could not enable the service!')
-            print(systemctl_error)
-            exit(1)
-    print("Done!")
+            print('* Reloading Systemd...Error')
+            print('  Systemd must reload all units before the new service is available:')
+            print('$ sudo systemctl daemon-reload')
+        else:
+            print("- Reloading Systemd...Done")
 else:
-    print("  This system does not appear to be running Systemd, skipping.")
+    print("- This system does not appear to be running Systemd, skipping.")
 
-print("\n* Install Python Dependencies")
-if os.path.isfile('/usr/bin/apt-get'):
-    print("  Using APT to install required modules...", end='')
-    apt_cmd = ['apt-get', '-qq', 'install', 'python3-systemd' 'python3-paho-mqtt']
-    apt = subprocess.run(apt_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    if apt.returncode != 0:
-        print('Warning!')
-        print('# Either the modules are already installed or we ran into a problem.')
-        print('# Please make sure the following Python 3 modules are available:')
-        print("# [systemd-python>=233] [paho-mqtt>=1.4.0]")
+time.sleep(1)
+print("\n# I2C Access")
+print('> Checking group permissions...', end='\r')
+groups_exec = subprocess.run(['groups', install_username], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+if groups_exec.returncode != 0:
+    print('* Checking group permissions...Error')
 else:
-    print("# You appear to be on a non-Debian based system or have installed")
-    print("# this script into a virtual enviroment, so we are unable to automatically")
-    print("# install the dependencies.")
-    print('# Please make sure the following Python 3 modules are available:')
-    print("# [systemd-python>=233] [paho-mqtt>=1.4.0]")
+    print('- Checking group permissions...Done')
+    groups = groups_exec.stdout.decode().rstrip().split()
+    if 'i2c' in groups:
+        print('  User [{}] is a member of group [i2c].'.format(install_username))
+    else:
+        print('* User [{}] does not appear to have non-root I2C access.'.format(install_username))
+        print('  Please run:')
+        print('$ sudo usermod -aG i2c {}'.format(install_username))
 
-print("\n* Readme First")
+time.sleep(1)
+print("\n# Readme First")
 print("""Congratulations! The BSEC-Conduit installation has completed.
+
+Please review the above log and follow any instructions given.
 
 Your next step is to edit 'bsec-conduit.ini' and set your options:
 $ nano bsec-conduit.ini
 
-Then you're ready to start the program with one of the following commands:
+Then you're ready to start the program with one of the following commands.
+
 >>> Systemd Based Distros <<<
+Start the daemon and watch the log for errors:
 $ sudo systemctl start bsec-conduit; journalctl -f -u bsec-conduit
+
+If no errors appear you can now enable the daemon to start at boot:
+$ sudo systemctl enable bsec-conduit.service
+
 >>> Other Distros <<<
+If you're running in a Python venv:
+$ source bin/activate
+Run the daemon and monitor the console for errors:
 $ ./bsec-conduit
 
-If no errors appear you should be good to go! On Systemd based distros you can
-safely reboot and the program will start automatically. On other systems you'll
-need to create a startup entry in your init system (runit, init.d, etc.) or add
-the following command to '/etc/rc.local' (if available):
-{}/bsec-conduit &
+If no errors appear you can now create a startup entry in your init system
+and reboot.
 
 If you run into problems please report them by opening a new issue on GitHub.
 

@@ -16,8 +16,8 @@ Released under the MIT License.
 Requires: [python-systemd] [paho.mqtt] [bseclib]
 """
 __program__ = 'BSEC-Conduit'
-__version__ = '0.3.3'
-__date__ = '2018.11.10'
+__version__ = '0.3.4'
+__date__ = '2018.11.16'
 __author__ = 'Timothy S. Brown'
 
 # Standard Modules
@@ -241,14 +241,31 @@ def exit_handler(signum, frame):
     # Exit with status code.
     exit(exit_code)
 
-## Get Raspberry Pi serial number.
-def get_rpi_serial():
+# Returns a unique 8 character hex string.
+def get_serial():
     serial = None
-    with open('/proc/cpuinfo', 'rt') as f:
-        for line in f:
-            if "Serial" in line:
-                serial = line[-9:].strip().upper()
-    return serial
+    # First attempt to get a serial from the device tree.
+    try:
+        with open('/sys/firmware/devicetree/base/serial-number', 'rt') as f:
+            serial = f.read().rstrip('\n\r\0').upper()[-8:]
+        if len(serial) == 8:
+            return serial
+    except FileNotFoundError:
+        pass
+    # If the DT entry doesn't exsist then we'll grab the last 8 characters of the MAC address, which should stay the same between invocations.
+    from uuid import getnode
+    mac = getnode()
+    # Make sure we got a universal MAC address.
+    if not (mac & (1 << 41)):
+        return hex(mac).upper()[-8:]
+    # If we didn't, fall back to a CRC32 of the system hostname.
+    else:
+        log.warn('Could not find a unique serial number or universal MAC address for this machine, falling back on a CRC32 of the system hostname instead.')
+        from socket import gethostname
+        from binascii import crc32
+        host = gethostname().encode()
+        crc = crc32(host) & 0xffffffff
+        return hex(crc).upper()[-8:]
 
 ## Get system hostname.
 def get_hostname():
@@ -290,7 +307,7 @@ if __name__ == "__main__":
     # Set a friendly name for the process.
     set_procname(__program__.lower())
     # Get the RPi serial number for use as a unique hardware ID.
-    rpi_serial = get_rpi_serial()
+    system_id = get_serial()
     # Get hostname.
     hostname = get_hostname()
     # Get sensor type.
@@ -298,13 +315,17 @@ if __name__ == "__main__":
 
     ## Config File Setup
     # Make sure the config file is valid.
-    if not os.path.isfile('bsec-conduit.ini'):
+    if os.path.isfile('bsec-conduit.ini'):
+        config_path = 'bsec-conduit.ini'
+    elif os.path.isfile('../bsec-conduit.ini'):
+        config_path = '../bsec-conduit.ini'
+    else:
         log.error('BSEC-Conduit config file not found! Expected a file named [bsec-conduit.ini].')
         raise Exception()
 
     # Config parser instance.
     config = configparser.ConfigParser()
-    config.read('bsec-conduit.ini')
+    config.read(config_path)
 
     # The base path.
     general_base_path = config['General']['base_path']
@@ -335,9 +356,9 @@ if __name__ == "__main__":
     # MQTT Client ID
     mqtt_client_id = config['MQTT']['client_id']
     if mqtt_client_id == '':
-        # Generate a client id (falls back on MQTT's auto-generation if we're not running on a Pi).
-        if rpi_serial is not None:
-            mqtt_client_id = '{}-{}'.format(sensor_type, rpi_serial)
+        # Generate a client id.
+        if system_id is not None:
+            mqtt_client_id = '{}-{}'.format(sensor_type, system_id)
             log.info("Generated MQTT Client ID: {}".format(mqtt_client_id))
         else:
             mqtt_client_id = None
@@ -405,10 +426,6 @@ if __name__ == "__main__":
     ## MQTT Setup
     # MQTT Client Object.
     mqttc = mqtt.Client(client_id = mqtt_client_id)
-    # If mqtt_client_id is still None it means mqtt.Client() auto-generated one, so
-    # we'll update mqtt_client_id with that information.
-    if mqtt_client_id is None:
-        mqtt_client_id = mqttc._client_id
     # Register callback handlers, enable logging and set the reconnect delay,
     # authentication parameters and last will.
     mqttc.on_connect = mqtt_on_connect

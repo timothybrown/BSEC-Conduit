@@ -22,15 +22,17 @@ Thanks to @rstoermer for `bsec_bme680.py` upon which I based this.
 `pip3 install python-systemd paho.mqtt`
 
 ## Installation
-In this example we'll be installing into `/opt/bsec` with the user `homeassistant`
-on a recent Debian based distro (Raspbian/Hassbian):
+In this example we'll be installing into a Python venv located at `/opt/bsec` with the
+user `pi` on a recent Debian based distro (Raspbian/Hassbian). You can use any location
+and user you want, just make sure they are a member of the `i2c` group.
 - `sudo mkdir /opt/bsec` Create the directory.
-- `sudo chown homeassistant:homeassistant /opt/bsec` Change permissions on the directory.
-- `sudo -u homeassistant -H -s` Login as the user.
-- `git clone https://github.com/timothybrown/BSEC-Conduit.git /opt/bsec` Clone the repo into our new directory.
+- `sudo chown pi:pi /opt/bsec` Change permissions on the directory.
+- `sudo -u pi git clone https://github.com/timothybrown/BSEC-Conduit.git /opt/bsec` Clone the repo into our new directory.
+- `sudo -u pi python3 -m venv /opt/bsec` Create our venv.
 - `cd /opt/bsec` Change into the directory.
+- `sudo -u pi pip3 install systemd-python paho-mqtt` Install required Python modules.
 - `sudo python3 install.py` Run the installer.
-- `nano bsec-conduit.ini` Edit the config section at the top of the file. Use `CTRL-X` to save.
+- `sudo -u pi nano bsec-conduit.ini` Edit the config section at the top of the file. Use `CTRL-X` to save.
 - `sudo systemctl start bsec-conduit.service; journalctl -f -u bsec-conduit.service` Start the program and open the log file.
 
 ## Usage
@@ -162,6 +164,14 @@ systemd[1]: Stopped BSEC-Conduit Daemon.
   - Added code to set a custom process name. This allows the program to show up
   in tools such as `top` by process name: `bsec-conduit` vs `python3 /path/to/bsec-conduit`.
   - A bit more code cleanup.
+- v0.3.4: 2018.11.16
+  - Reimplemented the way we generate the MQTT client ID to be more distro agnostic.
+  We first try to pull a system serial number out of the device tree. If that fails
+  we try to get the last eight characters of a universal MAC address through the
+  uuid.getnode() function. If *that* fails we fallback on a CRC32 of the system hostname.
+  - Fixed a bug in the config parser.
+  - Added some additional checks and messages to the installer.
+  - Moved the Systemd service template from `installer.py` into a file named `systemd-template`.
 
 # BSECLibrary
 Uses the Bosch BSEC sensor fusion library to retrieve and process data from a BME680 sensor.
@@ -254,3 +264,8 @@ for sample in bsec_lib.output():
 - v0.1.4: 2018.11.10
   - Changed the name of the underlying process from `bsec_library` to `bsec-library`
   to better match overall naming conventions.
+- v0.1.5: 2018.11.16
+  - Stopped directly setting the TZ environment variable before launching the bsec_library
+  process. Now we make a copy of the entire environment, modify it and pass it to Popen().
+  - Renamed `bseclib.py` => `__init__.py` and moved it into a directory named `bseclib`.
+  This is in preparation for turning BSECLibrary into a full fledged Python module.
