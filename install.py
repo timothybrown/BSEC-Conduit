@@ -85,10 +85,14 @@ else:
     print("  No venv found. Assuming we're running under the system Python enviroment.")
 try:
     import paho.mqtt
+except ImportError:
+    has_mqtt = False
 except ModuleNotFoundError:
     has_mqtt = False
 try:
     import systemd
+except ImportError:
+    has_systemd = False
 except ModuleNotFoundError:
     has_systemd = False
 if has_mqtt:
