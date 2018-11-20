@@ -72,6 +72,20 @@ else:
 
 time.sleep(1)
 print("\n# Checking for Python Dependencies")
+
+def install_module(module_name):
+    current_env = os.environ.copy()
+    command = ['pip', 'install', module_name]
+    pip = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=current_env)
+    if pip.returncode != 0:
+        systemctl_error = systemctl.stdout.decode()
+        print('* Attempting to install [{}] into our venv...Error'.format(module_name))
+        print("  Please use pip to install these packages inside your venv manually.")
+        print("$ pip3 install systemd-python")
+    else:
+        print('- Attempting to install [{}] into our venv...Done'.format(module_name))
+
+
 has_mqtt = True
 has_systemd = True
 print('> Checking enviroment...', end='\r')
@@ -83,38 +97,57 @@ else:
     is_venv = False
     print("- Checking enviroment...Done")
     print("  No venv found. Assuming we're running under the system Python enviroment.")
+
 try:
     import paho.mqtt
 except ImportError:
     has_mqtt = False
 except ModuleNotFoundError:
     has_mqtt = False
-try:
-    import systemd
-except ImportError:
-    has_systemd = False
-except ModuleNotFoundError:
-    has_systemd = False
+if os.path.isdir(systemd_dir):
+    try:
+        import systemd
+    except ImportError:
+        has_systemd = False
+    except ModuleNotFoundError:
+        has_systemd = False
+
 if has_mqtt:
-    print('- Module [paho.mqtt] found.')
+    print('- Module [paho-mqtt] found.')
 else:
-    print('* Module [paho.mqtt] not found.')
+    print('* Module [paho-mqtt] not found.')
     if is_venv:
-        print("  Please use pip to install these packages inside your venv.")
-        print("$ pip3 install paho-mqtt")
+        print("> Attempting to install [paho-mqtt] into our venv...", end="\r")
+        install_module('paho-mqtt')
     else:
         print("  Please use your system package manager or pip to install.")
-        print("$ apt-get install python3-paho-mqtt")
-if has_systemd:
+        print("$ sudo apt-get install python3-paho-mqtt")
+if has_systemd and os.path.isdir(systemd_dir):
     print('- Module [systemd-python] found.')
 else:
     print('* Module [systemd-python] not found.')
     if is_venv:
-        print("  Please use pip to install these packages inside your venv.")
-        print("$ pip3 install systemd-python")
+        print("> Attempting to install [systemd-python] into our venv...", end="\r")
+        install_module('systemd-python')
     else:
         print("  Please use your system package manager or pip to install.")
-        print("$ apt-get install python3-systemd")
+        print("$ sudo apt-get install python3-systemd")
+if is_venv:
+    dst_dir = '{}/lib/python{}.{}/site-packages/'.format(install_dir, sys.version_info[0], sys.version_info[1])
+    src_dir = '{}/bseclib'.format(install_dir)
+    if not os.path.isdir(dst_dir + 'bseclib'):
+        try:
+            print("> Attempting to install [bseclib] into our venv...", end="\r")
+            shutil.move(src_dir, dst_dir)
+        except:
+            print("* Attempting to install [bseclib] into our venv...Error")
+            print("  Please manually copy [bseclib] into the venv site-packages folder.")
+            print("$ sudo mv {} {}".format(src_dir, dst_dir))
+        else:
+            print("- Attempting to install [bseclib] into our venv...Done")
+            print("  {}=>{}bseclib".format(src_dir, dst_dir))
+    else:
+        print('- Module [bseclib] found.')
 
 time.sleep(1)
 print("\n# Systemd Unit Setup")
@@ -130,7 +163,7 @@ if os.path.isdir(systemd_dir):
             unit_exec = 'ExecStart={dir}/bsec-conduit'.format(dir=install_dir)
         outpath = '{}/{}'.format(systemd_dir, systemd_name)
         inpath = '{}/systemd-template'.format(install_dir, systemd_name)
-        with open(inpath, 'rt') as input, open(outpath, 'xt') as output:
+        with open(inpath, 'rt') as input, open(outpath, 'wt') as output:
             for line in input:
                 line = line.rstrip()
                 if line.startswith("User="):
@@ -141,7 +174,7 @@ if os.path.isdir(systemd_dir):
                     line = unit_exec
                 output.write(line)
                 time.sleep(0.1)
-        os.remove(inpath)
+        #os.remove(inpath)
         print("- Writing service file [{}]...Done".format(systemd_name))
         systemd_reload = True
     except:
@@ -171,6 +204,41 @@ else:
 
 time.sleep(1)
 print("\n# I2C Access")
+if os.path.isfile('/boot/config.txt'):
+    print("> Checking if I2C-1 is enabled...", end='\r')
+    i2c_found = False
+    with open('/boot/config.txt', 'rt') as f:
+        for line in f:
+            line = line.rstrip()
+            if 'i2c_arm=on' in line:
+                i2c_found = True
+    if not i2c_found:
+        print("* Checking if I2C-1 is enabled......Not Enabled")
+        try:
+            print("> Enabling I2C-1 entry in device tree...", end='\r')
+            with open('/boot/config.txt', 'w+t') as f:
+                f.write('dtparam=i2c_arm=on')
+        except:
+            print("* Enabling I2C-1 entry in device tree...Error")
+            print("  Problem writing to file. Please add the following line to /boot/config.txt:")
+            print("  dtparam=i2c_arm=on")
+        else:
+            print("- Enabling I2C-1 entry in device tree...Done")
+
+        try:
+            print("> Enabling I2C-DEV kernel module...", end='\r')
+            with open('/etc/modules-load.d/i2c.conf', 'wt') as f:
+                f.write('i2c-dev')
+        except:
+            print("* Enabling I2C-DEV kernel module...Error")
+            print("  Please add the following line to /etc/modules-load.d/i2c.conf:")
+            print("  i2c-dev")
+        else:
+            print("- Enabling I2C-DEV kernel module...Done")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!                   Please Reboot your Pi to Activate I2C                   !!")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
 print('> Checking group permissions...', end='\r')
 groups_exec = subprocess.run(['groups', install_username], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 if groups_exec.returncode != 0:
@@ -181,9 +249,15 @@ else:
     if 'i2c' in groups:
         print('  User [{}] is a member of group [i2c].'.format(install_username))
     else:
-        print('* User [{}] does not appear to have non-root I2C access.'.format(install_username))
-        print('  Please run:')
-        print('$ sudo usermod -aG i2c {}'.format(install_username))
+        print('  User [{}] does not appear to have non-root I2C access.'.format(install_username))
+        print("> Attempting to add user to I2C group...", end='\r')
+        usermod_exec = subprocess.run(['usermod', '-a', '-G', 'i2c', install_username], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if groups_exec.returncode != 0:
+            print('* Attempting to add user to I2C group...Error')
+            print('  Please run:')
+            print('$ sudo usermod -aG i2c {}'.format(install_username))
+        else:
+            print("- Attempting to add user to I2C group...Done")
 
 time.sleep(1)
 print("\n# Readme First")
