@@ -30,6 +30,7 @@ and user you want, just make sure they are a member of the `i2c` group.
 - `sudo -u pi git clone https://github.com/timothybrown/BSEC-Conduit.git /opt/bsec` Clone the repo into our new directory.
 - `sudo -u pi python3 -m venv /opt/bsec` Create our venv.
 - `cd /opt/bsec` Change into the directory.
+- `source bin/activate` Activate our new venv.
 - `sudo -u pi pip3 install systemd-python paho-mqtt` Install required Python modules.
 - `sudo python3 install.py` Run the installer.
 - `sudo -u pi nano bsec-conduit.ini` Edit the config section at the top of the file. Use `CTRL-X` to save.
