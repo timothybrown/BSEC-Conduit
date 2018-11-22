@@ -262,7 +262,7 @@ print("\n# Directory Permissions")
 print("> Setting permissions on BSEC directory...", end='\r')
 try:
     shutil.chown(install_dir, user=install_uid, group=install_gid)
-    for dirpath, dirnames, filenames in os.walk(bsec_dir):
+    for dirpath, dirnames, filenames in os.walk(install_dir):
         if len(dirnames) > 0:
             for dir in dirnames:
                 shutil.chown(os.path.join(dirpath, dir), user=install_uid, group=install_gid)
